@@ -27,14 +27,18 @@ if command -v jq >/dev/null 2>&1 \
     cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)
 else
     # Without jq, or with input jq cannot read, check the raw input so the
-    # destructive-command rule still applies.
-    cmd=$input
+    # destructive-command rule still applies. JSON escapes for line breaks and
+    # tabs become spaces, as they would in the decoded command.
+    cmd=$(printf '%s' "$input" | sed -E 's/\\[nrt]/ /g')
 fi
 [ -n "$cwd" ] || cwd=$PWD
 
 deny() {
-    # Reasons contain no double quotes or backslashes, so plain printf is valid JSON.
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by laravel-db-guard.sh (mig-laravel-guardrails): %s"}}\n' "$1"
+    # Escape the reason for JSON: it can hold a path, and a path can hold anything.
+    local reason=${1//\\/\\\\}
+    reason=${reason//\"/\\\"}
+    reason=${reason//[$'\n\r\t']/ }
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by laravel-db-guard.sh (mig-laravel-guardrails): %s"}}\n' "$reason"
     exit 0
 }
 
@@ -77,26 +81,34 @@ safe_pair() { # $1 connection, $2 database
     return 1
 }
 
-# 3a. Environment assignments directly in front of the test command.
-#     Take the words before the last test command and walk back over VAR=value
-#     words; a separator (; & |) or any other word ends the run.
-before=$(printf '%s' "$norm" | sed -nE "s#^(.*[;&|[:space:]])?($test_cmd).*#\1#p")
-before=${before//[;&|]/ ; }
-read -ra words <<< "$before"
-last=$(( ${#words[@]} - 1 ))
-[ "$last" -ge 0 ] && [ "${words[last]}" = php ] && last=$(( last - 1 ))
-conn="" db=""
-for (( i = last; i >= 0; i-- )); do
-    w=${words[i]}
-    [[ $w =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || break
-    case $w in
-        DB_CONNECTION=*) conn=${w#*=} ;;
-        DB_DATABASE=*) db=${w#*=} ;;
-    esac
-done
-safe_pair "$conn" "$db" && exit 0
+# 3a. Environment assignments directly in front of each test command. Split
+#     the command on ; & |, and for every part that runs tests, walk back over
+#     the VAR=value words before it. Walking back, the first value seen is the
+#     rightmost one, which is the one the shell uses. Every test command needs
+#     a safe pair; otherwise phpunit.xml decides.
+prefix_safe=true
+while IFS= read -r seg; do
+    printf '%s' "$seg" | grep -Eq "(^|[[:space:]])($test_cmd)" || continue
+    before=$(printf '%s' "$seg" | sed -nE "s#^(.*[[:space:]])?($test_cmd).*#\1#p")
+    read -ra words <<< "$before"
+    last=$(( ${#words[@]} - 1 ))
+    [ "$last" -ge 0 ] && [ "${words[last]}" = php ] && last=$(( last - 1 ))
+    conn="" db=""
+    for (( i = last; i >= 0; i-- )); do
+        w=${words[i]}
+        [[ $w =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || break
+        case $w in
+            DB_CONNECTION=*) [ -n "$conn" ] || conn=${w#*=} ;;
+            DB_DATABASE=*) [ -n "$db" ] || db=${w#*=} ;;
+        esac
+    done
+    safe_pair "$conn" "$db" || { prefix_safe=false; break; }
+done < <(printf '%s\n' "$norm" | sed -E 's/[;&|]+/\n/g')
+$prefix_safe && exit 0
 
-# 3b. phpunit.xml, parsed as XML so comments don't count.
+# 3b. phpunit.xml, parsed as XML so comments don't count. Only the <env> and
+#     <server> entries directly inside <php> apply, as in PHPUnit. A name set
+#     twice with different values counts as unsafe.
 xml=""
 for f in phpunit.xml phpunit.xml.dist; do [ -f "$root/$f" ] && { xml="$root/$f"; break; }; done
 if [ -n "$xml" ] && command -v python3 >/dev/null 2>&1; then
@@ -110,10 +122,15 @@ try:
     tree = ET.ElementTree(ET.fromstring(text))
 except Exception:
     sys.exit(0)
+php = tree.getroot().find("php")
 values = {}
-for el in tree.getroot().iter():
-    if el.tag in ("env", "server") and el.get("name") in ("DB_CONNECTION", "DB_DATABASE"):
-        values.setdefault(el.get("name"), el.get("value", ""))
+for el in (php if php is not None else []):
+    name = el.get("name")
+    if el.tag in ("env", "server") and name in ("DB_CONNECTION", "DB_DATABASE"):
+        value = el.get("value", "")
+        if values.get(name, value) != value:
+            sys.exit(0)  # conflicting values: treat the file as unsafe
+        values[name] = value
 print(values.get("DB_CONNECTION", ""), values.get("DB_DATABASE", ""))
 PY
 )

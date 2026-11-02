@@ -27,6 +27,7 @@
     "./skills/mig-orchestrator",
     "./skills/mig-pt-pt",
     "./skills/mig-relay",
-    "./skills/mig-review-findings"
+    "./skills/mig-review-findings",
+    "./skills/mig-seo-audit"
   ]
 }

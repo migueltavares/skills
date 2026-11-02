@@ -1,0 +1,6 @@
+interface:
+  display_name: "mig-seo-audit"
+  short_description: "SEO, analytics, Cloudflare and launch audit"
+  default_prompt: "Use $mig-seo-audit for https://example.pt."
+policy:
+  allow_implicit_invocation: false

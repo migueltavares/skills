@@ -37,7 +37,7 @@ deny() {
     # Escape the reason for JSON: it can hold a path, and a path can hold anything.
     local reason=${1//\\/\\\\}
     reason=${reason//\"/\\\"}
-    reason=${reason//[$'\n\r\t']/ }
+    reason=${reason//[[:cntrl:]]/ }
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by laravel-db-guard.sh (mig-laravel-guardrails): %s"}}\n' "$reason"
     exit 0
 }
@@ -82,7 +82,8 @@ safe_pair() { # $1 connection, $2 database
 }
 
 # 3a. Environment assignments directly in front of each test command. Split
-#     the command on ; & |, and for every part that runs tests, walk back over
+#     the command on ; & | and line breaks (a backslash at the end of a line
+#     continues it, as in the shell), and for every part that runs tests, walk back over
 #     the VAR=value words before it. Walking back, the first value seen is the
 #     rightmost one, which is the one the shell uses. Every test command needs
 #     a safe pair; otherwise phpunit.xml decides.
@@ -103,7 +104,7 @@ while IFS= read -r seg; do
         esac
     done
     safe_pair "$conn" "$db" || { prefix_safe=false; break; }
-done < <(printf '%s\n' "$norm" | sed -E 's/[;&|]+/\n/g')
+done < <(printf '%s\n' "${cmd//$'\\\n'/ }" | tr -d "\"'\\\\" | tr '\r\t' '  ' | sed -E 's/[;&|]+/\n/g')
 $prefix_safe && exit 0
 
 # 3b. phpunit.xml, parsed as XML so comments don't count. Only the <env> and
@@ -122,9 +123,8 @@ try:
     tree = ET.ElementTree(ET.fromstring(text))
 except Exception:
     sys.exit(0)
-php = tree.getroot().find("php")
 values = {}
-for el in (php if php is not None else []):
+for el in (child for php in tree.getroot().findall("php") for child in php):
     name = el.get("name")
     if el.tag in ("env", "server") and name in ("DB_CONNECTION", "DB_DATABASE"):
         value = el.get("value", "")

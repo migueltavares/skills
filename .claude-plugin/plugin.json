@@ -1,7 +1,7 @@
 {
   "name": "mig-skills",
-  "version": "0.1.0",
-  "description": "Agent skills for shipping where a merge deploys: merge PRs in a safe order, clean up after merges, hand off to the next thread, verify review findings, and keep agents from wiping Laravel databases.",
+  "version": "0.2.0",
+  "description": "Agent skills for repos where a merge deploys: orchestrate issues across models, merge PRs one deploy at a time, hand off between threads, verify reviews, audit apps and sites, write European Portuguese, and keep agents from wiping Laravel databases.",
   "author": {
     "name": "Miguel Tavares",
     "url": "https://github.com/migueltavares"
@@ -13,8 +13,11 @@
     "pull-requests",
     "merge",
     "handoff",
+    "orchestration",
     "code-review",
-    "laravel"
+    "laravel",
+    "seo",
+    "portuguese"
   ],
   "skills": [
     "./skills/mig-audit-codebase",

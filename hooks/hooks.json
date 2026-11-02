@@ -1,0 +1,17 @@
+{
+  "description": "mig-laravel-guardrails: block commands that drop every table, and test runs that could reach a real database.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/skills/mig-laravel-guardrails/scripts/laravel-db-guard.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

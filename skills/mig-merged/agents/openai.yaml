@@ -1,0 +1,6 @@
+interface:
+  display_name: "mig-merged"
+  short_description: "Clean up branches and worktrees after a merge"
+  default_prompt: "Use $mig-merged for PR 12, which I merged on GitHub."
+policy:
+  allow_implicit_invocation: true

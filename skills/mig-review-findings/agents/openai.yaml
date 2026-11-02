@@ -1,0 +1,6 @@
+interface:
+  display_name: "mig-review-findings"
+  short_description: "Verify PR review comments, fix the real ones"
+  default_prompt: "Use $mig-review-findings on PR 12."
+policy:
+  allow_implicit_invocation: true

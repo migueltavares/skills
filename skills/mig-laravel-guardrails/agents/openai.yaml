@@ -1,0 +1,6 @@
+interface:
+  display_name: "mig-laravel-guardrails"
+  short_description: "Stop agents from wiping Laravel databases"
+  default_prompt: "Use $mig-laravel-guardrails to check this machine and repo."
+policy:
+  allow_implicit_invocation: true

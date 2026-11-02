@@ -1,0 +1,6 @@
+interface:
+  display_name: "mig-relay"
+  short_description: "Write the prompt that starts the next thread"
+  default_prompt: "Use $mig-relay to give me the next prompt."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,96 @@
+---
+name: mig-merged
+description: Clean up after merged pull requests. Verify each merge, update the default branch, retarget stacked PRs, remove merged worktrees and branches, then hand off with mig-relay. Use for /mig-merged [PR numbers], when the user says a PR is merged, and from mig-merge after each merge.
+metadata:
+  credits:
+    - skill: handoff
+      author: Matt Pocock
+      url: https://github.com/mattpocock/skills/tree/main/skills/productivity/handoff
+      license: MIT
+    - skill: wrap
+      author: gtapps
+      url: https://github.com/gtapps/skills/blob/main/skills/wrap/SKILL.md
+      note: Loose ends line adapted with the author's permission.
+---
+
+# mig-merged
+
+A merged PR leaves branches, worktrees and sometimes a stacked PR pointing at a branch that is about to disappear. This skill clears all of it, so the checkout sits on an up-to-date default branch and the next step can start.
+
+Input: PR numbers in any form (`/mig-merged 12 14`, "PR 12 and 14", "#12, #14"). With none, find candidates: merged PRs whose head branch still exists locally or as a worktree.
+
+```bash
+gh pr list --state merged --limit 30 --json number,headRefName,headRefOid,mergedAt
+git branch --format='%(refname:short)'
+git worktree list --porcelain
+```
+
+Show the candidates and clean up the ones the user confirms.
+
+## Safety rules
+
+- Delete a branch only after `gh` reports its PR as `MERGED`, and only when the branch holds nothing the PR did not (step 4).
+- Retarget before deleting. Deleting a branch that an open PR uses as its base closes that PR.
+- History only moves forward here: plain pushes, merges and cherry-picks.
+
+## Steps
+
+Run from the main checkout, the first entry in `git worktree list`.
+
+**1. Verify.** For each PR:
+
+```bash
+gh pr view <n> --json state,mergedAt,mergeCommit,headRefName,headRefOid,baseRefName
+```
+
+A PR that is not `MERGED` is skipped and reported. If the user wants the agent to merge it, that's `/mig-merge <n>`.
+
+**2. Update the default branch.** `git fetch --prune origin`, switch to the default branch, `git pull --ff-only`. Uncommitted changes in the main checkout stop the run: list them and ask.
+
+**3. Retarget stacked PRs.** For each merged head branch:
+
+```bash
+gh pr list --state open --base <headRefName> --json number,headRefName
+```
+
+For each PR found:
+1. `gh pr edit <m> --base <default branch>`.
+2. In that PR's branch or worktree, `git merge origin/<default branch>`. The merged content is already on the default branch, so conflicts usually resolve to its side. Stop and ask when a resolution is not obvious.
+3. Run the project's checks, then `git push`.
+4. Tell the user that CI runs again on that PR before it can merge.
+
+**4. Rescue late commits.** Commits pushed to a branch after its PR merged would vanish with the branch. Check both copies:
+
+```bash
+git rev-list <headRefOid>..<branch>          # local
+git rev-list <headRefOid>..origin/<branch>   # remote, if it still exists
+```
+
+When git reports `<headRefOid>` as an unknown revision, fetch it first with `git fetch origin pull/<n>/head`. When either check lists commits, create `<branch>-followup` from `origin/<default branch>`, cherry-pick them, push, and open a PR that names the original. The old branch stays until that PR exists.
+
+**5. Remove worktrees.** For each worktree on a merged branch:
+- Skip it when `git -C <path> status --porcelain` shows changes. It goes in the loose ends line.
+- In T3 Code, skip it when an open thread still uses it (`t3_worktree_list`, `t3_worktree_status`).
+- Otherwise `git worktree remove <path>`.
+
+Then run `git worktree prune`.
+
+**6. Delete branches.**
+- Local: when `git merge-base --is-ancestor <branch> <headRefOid>` succeeds, `git branch -D <branch>`. Squash merges make `git branch -d` refuse, and the ancestor check is what makes `-D` safe.
+- Remote: `git push origin --delete <branch>`, unless `git ls-remote --heads origin <branch>` shows GitHub already removed it.
+
+Done when every merged PR's branch and clean worktrees are gone, every stacked PR targets the default branch, and the main checkout is on the updated default branch.
+
+## Report and hand off
+
+One line per PR: number, merge commit, branches deleted, worktrees removed, PRs retargeted, late commits moved. Then one line:
+
+```text
+Loose ends: <dirty worktrees with paths> | <retargeted PRs waiting for CI> | <follow-up PRs opened> | none
+```
+
+Then:
+- Called from `mig-merge`: return here. `mig-merge` hands off once, after its last PR.
+- The next step needs the user first (credentials, a server step, a decision): say exactly what, and stop.
+- Work remains in an order (a plan in `docs/handoff/`, open issues this thread was working through, a later phase): invoke `mig-relay` for the next prompt.
+- Nothing remains: stop after the report.

@@ -1,0 +1,6 @@
+interface:
+  display_name: "mig-merge"
+  short_description: "Merge PRs in a safe order, one deploy at a time"
+  default_prompt: "Use $mig-merge to merge PRs 12 and 14."
+policy:
+  allow_implicit_invocation: false

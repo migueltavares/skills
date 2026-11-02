@@ -1,0 +1,17 @@
+{
+  "name": "mig",
+  "owner": {
+    "name": "Miguel Tavares",
+    "url": "https://github.com/migueltavares"
+  },
+  "description": "Miguel Tavares's agent skills, as an installable Claude Code plugin.",
+  "plugins": [
+    {
+      "name": "mig-skills",
+      "source": "./",
+      "description": "Merge PRs one deploy at a time, clean up after merges, hand off to the next thread, verify review findings, and guard Laravel databases.",
+      "category": "engineering",
+      "keywords": ["skills", "pull-requests", "merge", "handoff", "laravel"]
+    }
+  ]
+}

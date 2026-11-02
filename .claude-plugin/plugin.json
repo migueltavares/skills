@@ -20,6 +20,7 @@
     "./skills/mig-laravel-guardrails",
     "./skills/mig-merge",
     "./skills/mig-merged",
+    "./skills/mig-mode",
     "./skills/mig-orchestrator",
     "./skills/mig-relay",
     "./skills/mig-review-findings"

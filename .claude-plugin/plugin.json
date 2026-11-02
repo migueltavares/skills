@@ -17,6 +17,7 @@
     "laravel"
   ],
   "skills": [
+    "./skills/mig-audit-codebase",
     "./skills/mig-laravel-guardrails",
     "./skills/mig-merge",
     "./skills/mig-merged",

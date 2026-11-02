@@ -1,0 +1,6 @@
+interface:
+  display_name: "mig-memory-evolution"
+  short_description: "Move repeated memory rules to one home"
+  default_prompt: "Use $mig-memory-evolution."
+policy:
+  allow_implicit_invocation: false

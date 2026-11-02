@@ -9,9 +9,15 @@
     {
       "name": "mig-skills",
       "source": "./",
-      "description": "Merge PRs one deploy at a time, clean up after merges, hand off to the next thread, verify review findings, and guard Laravel databases.",
+      "description": "Orchestrate issues across models, merge PRs one deploy at a time, hand off between threads, verify reviews, audit apps and sites, write European Portuguese, and guard Laravel databases.",
       "category": "engineering",
-      "keywords": ["skills", "pull-requests", "merge", "handoff", "laravel"]
+      "keywords": [
+        "skills",
+        "pull-requests",
+        "merge",
+        "handoff",
+        "laravel"
+      ]
     }
   ]
 }

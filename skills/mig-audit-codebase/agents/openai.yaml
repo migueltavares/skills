@@ -1,0 +1,6 @@
+interface:
+  display_name: "mig-audit-codebase"
+  short_description: "Audit an app and turn findings into ordered issues"
+  default_prompt: "Use $mig-audit-codebase on this app."
+policy:
+  allow_implicit_invocation: true

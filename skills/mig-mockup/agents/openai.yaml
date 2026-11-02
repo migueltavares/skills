@@ -1,0 +1,6 @@
+interface:
+  display_name: "mig-mockup"
+  short_description: "Design options as HTML mockups before app code"
+  default_prompt: "Use $mig-mockup for the pricing page."
+policy:
+  allow_implicit_invocation: true

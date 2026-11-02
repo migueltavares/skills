@@ -82,13 +82,15 @@ safe_pair() { # $1 connection, $2 database
 }
 
 # 3a. Environment assignments directly in front of each test command. Split
-#     the command on ; & | and line breaks (a backslash at the end of a line
-#     continues it, as in the shell), and for every part that runs tests, walk back over
-#     the VAR=value words before it. Walking back, the first value seen is the
-#     rightmost one, which is the one the shell uses. Every test command needs
-#     a safe pair; otherwise phpunit.xml decides.
+#     the command on ; & | and line breaks, and for every part that runs
+#     tests, walk back over the VAR=value words before it. Walking back, the
+#     first value seen is the rightmost one, which is the one the shell uses.
+#     Every test command needs a safe pair; otherwise phpunit.xml decides.
+#     A backslash before a line break may or may not continue the line, so
+#     such commands never count as safe here and phpunit.xml decides.
 prefix_safe=true
-while IFS= read -r seg; do
+case "$cmd" in *$'\\\n'*) prefix_safe=false ;; esac
+$prefix_safe && while IFS= read -r seg; do
     printf '%s' "$seg" | grep -Eq "(^|[[:space:]])($test_cmd)" || continue
     before=$(printf '%s' "$seg" | sed -nE "s#^(.*[[:space:]])?($test_cmd).*#\1#p")
     read -ra words <<< "$before"
@@ -104,7 +106,7 @@ while IFS= read -r seg; do
         esac
     done
     safe_pair "$conn" "$db" || { prefix_safe=false; break; }
-done < <(printf '%s\n' "${cmd//$'\\\n'/ }" | tr -d "\"'\\\\" | tr '\r\t' '  ' | sed -E 's/[;&|]+/\n/g')
+done < <(printf '%s\n' "$cmd" | tr -d "\"'\\\\" | tr '\r\t' '  ' | sed -E 's/[;&|]+/\n/g')
 $prefix_safe && exit 0
 
 # 3b. phpunit.xml, parsed as XML so comments don't count. Only the <env> and

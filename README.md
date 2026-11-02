@@ -29,6 +29,7 @@ Call a skill as `/mig-merge 12` in Claude Code, or `$mig-merge 12` in Codex.
 | [mig-review-findings](skills/mig-review-findings/SKILL.md) | `/mig-review-findings 12` | Checks each review comment against the code, fixes the confirmed ones, and answers the rest. |
 | [mig-laravel-guardrails](skills/mig-laravel-guardrails/SKILL.md) | `/mig-laravel-guardrails` once | Blocks `migrate:fresh`, `db:wipe` and test runs that could reach a real database, in Claude Code and Codex. |
 | [mig-orchestrator](skills/mig-orchestrator/SKILL.md) | `/mig-orchestrator #42` | Checks the issue still holds, briefs cheaper models with contracts, judges their work from git, gets a review from the other provider, and opens the PR. |
+| [mig-mode](skills/mig-mode/SKILL.md) | `/mig-mode setup` once | Writes the always-on working rules, and unslop, into global CLAUDE.md and Codex's AGENTS.md. |
 
 How they chain:
 
@@ -51,7 +52,7 @@ Server names, paths and client names stay in each project's files. The skills ho
 
 ## Planned
 
-`mig-mode`, `mig-mockup`, `mig-my-turn`, `mig-audit-codebase`, `mig-pt-pt`, `mig-seo-audit`, `mig-memory-evolution`.
+`mig-mockup`, `mig-my-turn`, `mig-audit-codebase`, `mig-pt-pt`, `mig-seo-audit`, `mig-memory-evolution`.
 
 ## Credits
 

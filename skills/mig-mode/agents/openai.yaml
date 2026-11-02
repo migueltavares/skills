@@ -1,0 +1,6 @@
+interface:
+  display_name: "mig-mode"
+  short_description: "Always-on working rules, including unslop"
+  default_prompt: "Use $mig-mode to run setup."
+policy:
+  allow_implicit_invocation: false

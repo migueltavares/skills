@@ -35,6 +35,7 @@ Call a skill as `/mig-merge 12` in Claude Code, or `$mig-merge 12` in Codex.
 | [mig-audit-codebase](skills/mig-audit-codebase/SKILL.md) | `/mig-audit-codebase`, or add `invisible` | Audits security, data safety, performance and reliability, verifies each finding, files issues, and writes the work order. |
 | [mig-pt-pt](skills/mig-pt-pt/SKILL.md) | loads for any Portuguese text | Writes and reviews European Portuguese: vocabulary, grammar, formats and AI tells, with a per-project glossary. |
 | [mig-seo-audit](skills/mig-seo-audit/SKILL.md) | `/mig-seo-audit https://example.pt` | Audits a public site and sets up SEO, AI search, analytics with consent, Cloudflare, Search Console and the contact form. |
+| [mig-memory-evolution](skills/mig-memory-evolution/SKILL.md) | `/mig-memory-evolution` | Finds rules repeated across project memories and gives each one home: a skill, the global rules, a hook or a checklist. |
 
 How they chain:
 
@@ -54,10 +55,6 @@ The skills read project facts from `AGENTS.md`, which Codex and Claude Code both
 - Work orders live in `docs/handoff/<date>-<slug>.md`. `mig-relay` reads the newest one.
 
 Server names, paths and client names stay in each project's files. The skills hold none.
-
-## Planned
-
-`mig-memory-evolution`.
 
 ## Credits
 

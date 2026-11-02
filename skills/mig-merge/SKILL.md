@@ -48,6 +48,7 @@ Tell the user it changed. Without admin rights on the repo, say so and carry on 
 **Deploy section.** Read the project's instructions: AGENTS.md, or CLAUDE.md when it holds the guidance instead of pointing to AGENTS.md. Find the `## Deploy` section. When it's missing, work it out:
 - A workflow in `.github/workflows/` that runs on push to the default branch and deploys means GitHub Actions.
 - No such workflow means a manual deploy. Ask the user where they run it (a server alias, never a secret), the directory, the command, and how they know it worked.
+- A repo that ships nothing on merge (a library, a docs or skills repo) gets `Method: none`. Confirm it with the user before writing it.
 
 Then write the section into the file that owns the guidance, never into both. When neither file exists, create AGENTS.md, plus a CLAUDE.md that holds only `@AGENTS.md`.
 
@@ -99,7 +100,7 @@ gh pr merge <n> --squash --match-head-commit <headRefOid>
 
 `--match-head-commit` refuses the merge when someone pushed after the gate passed. With a merge queue or auto-merge, wait until GitHub reports `MERGED`.
 
-**d. Deploy.** Follow the Deploy section.
+**d. Deploy.** Follow the Deploy section. With `Method: none`, go straight to cleanup.
 - GitHub Actions: find the run with `gh run list --branch <default branch> --commit <merge commit sha> --json databaseId,workflowName,status,conclusion`. It can take a minute to appear. Wait on it with `gh run watch <id> --exit-status`. In T3 Code, run that as a background command and wait with `t3_background_wait`.
 - Manual: give the user one block, labeled with the machine ("On <server>"), holding the exact commands. Ask with the question tool for the output or "deployed", and check the reply before going on.
 - Then the health check, when the section names one.

@@ -21,9 +21,9 @@ Agents with a cached config have run `RefreshDatabase` against real local databa
 
 The guard is `scripts/laravel-db-guard.sh` in this skill's directory, run before every shell command in Claude Code and Codex, in every permission mode. It blocks:
 
-- `migrate:fresh`, `migrate:refresh`, `migrate:reset` and `db:wipe`, including inside ssh commands.
-- Test runs while `bootstrap/cache/config.php` exists, since a cached config ignores `DB_CONNECTION=sqlite`.
-- Test runs when `phpunit.xml` does not point at SQLite or a database whose name contains "test", unless the command sets `DB_CONNECTION=sqlite` itself.
+- `migrate:fresh`, `migrate:refresh`, `migrate:reset` and `db:wipe`, in any form artisan accepts: quoted, abbreviated (`migrate:fr`), inside ssh commands, or through `Artisan::call` in tinker.
+- Test runs while `bootstrap/cache/config.php` exists, since a cached config ignores `phpunit.xml` and the environment.
+- Test runs whose database is not SQLite in memory or a database whose name contains "test". The guard reads `phpunit.xml` as XML, so commented-out lines don't count, and accepts `DB_CONNECTION=sqlite DB_DATABASE=:memory:` written directly in front of the test command.
 
 Steps:
 

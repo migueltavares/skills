@@ -25,6 +25,7 @@
     "./skills/mig-mode",
     "./skills/mig-my-turn",
     "./skills/mig-orchestrator",
+    "./skills/mig-pt-pt",
     "./skills/mig-relay",
     "./skills/mig-review-findings"
   ]

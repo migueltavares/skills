@@ -1,0 +1,6 @@
+interface:
+  display_name: "mig-pt-pt"
+  short_description: "European Portuguese copy without Brazilian forms"
+  default_prompt: "Use $mig-pt-pt to translate this page."
+policy:
+  allow_implicit_invocation: true

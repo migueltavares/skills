@@ -34,6 +34,7 @@ Call a skill as `/mig-merge 12` in Claude Code, or `$mig-merge 12` in Codex.
 | [mig-my-turn](skills/mig-my-turn/SKILL.md) | other skills hand over to it | Gives the steps only you can run, one at a time, with the machine named for each, and checks every result. |
 | [mig-audit-codebase](skills/mig-audit-codebase/SKILL.md) | `/mig-audit-codebase`, or add `invisible` | Audits security, data safety, performance and reliability, verifies each finding, files issues, and writes the work order. |
 | [mig-pt-pt](skills/mig-pt-pt/SKILL.md) | loads for any Portuguese text | Writes and reviews European Portuguese: vocabulary, grammar, formats and AI tells, with a per-project glossary. |
+| [mig-seo-audit](skills/mig-seo-audit/SKILL.md) | `/mig-seo-audit https://example.pt` | Audits a public site and sets up SEO, AI search, analytics with consent, Cloudflare, Search Console and the contact form. |
 
 How they chain:
 
@@ -56,7 +57,7 @@ Server names, paths and client names stay in each project's files. The skills ho
 
 ## Planned
 
-`mig-seo-audit`, `mig-memory-evolution`.
+`mig-memory-evolution`.
 
 ## Credits
 

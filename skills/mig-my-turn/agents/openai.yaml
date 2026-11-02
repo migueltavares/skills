@@ -1,0 +1,6 @@
+interface:
+  display_name: "mig-my-turn"
+  short_description: "Steps only you can run, one at a time"
+  default_prompt: "Use $mig-my-turn to walk me through the server steps."
+policy:
+  allow_implicit_invocation: true

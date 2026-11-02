@@ -31,6 +31,7 @@ Call a skill as `/mig-merge 12` in Claude Code, or `$mig-merge 12` in Codex.
 | [mig-orchestrator](skills/mig-orchestrator/SKILL.md) | `/mig-orchestrator #42` | Checks the issue still holds, briefs cheaper models with contracts, judges their work from git, gets a review from the other provider, and opens the PR. |
 | [mig-mode](skills/mig-mode/SKILL.md) | `/mig-mode setup` once | Writes the always-on working rules, and unslop, into global CLAUDE.md and Codex's AGENTS.md. |
 | [mig-mockup](skills/mig-mockup/SKILL.md) | `/mig-mockup pricing page` | Builds 2 or 3 HTML mockups, checks them at desktop and phone widths, and records the chosen design before any app code changes. |
+| [mig-my-turn](skills/mig-my-turn/SKILL.md) | other skills hand over to it | Gives the steps only you can run, one at a time, with the machine named for each, and checks every result. |
 
 How they chain:
 
@@ -53,7 +54,7 @@ Server names, paths and client names stay in each project's files. The skills ho
 
 ## Planned
 
-`mig-my-turn`, `mig-audit-codebase`, `mig-pt-pt`, `mig-seo-audit`, `mig-memory-evolution`.
+`mig-audit-codebase`, `mig-pt-pt`, `mig-seo-audit`, `mig-memory-evolution`.
 
 ## Credits
 

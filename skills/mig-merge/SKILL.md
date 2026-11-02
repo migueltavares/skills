@@ -102,7 +102,7 @@ gh pr merge <n> --squash --match-head-commit <headRefOid>
 
 **d. Deploy.** Follow the Deploy section. With `Method: none`, go straight to cleanup.
 - GitHub Actions: find the run with `gh run list --branch <default branch> --commit <merge commit sha> --json databaseId,workflowName,status,conclusion`. It can take a minute to appear. Wait on it with `gh run watch <id> --exit-status`. In T3 Code, run that as a background command and wait with `t3_background_wait`.
-- Manual: give the user one block, labeled with the machine ("On <server>"), holding the exact commands. Ask with the question tool for the output or "deployed", and check the reply before going on.
+- Manual: hand the step to `mig-my-turn` when it is installed. Otherwise give the user one block, labeled with the machine ("On <server>"), holding the exact commands. Ask with the question tool for the output or "deployed", and check the reply before going on.
 - Then the health check, when the section names one.
 
 A failed deploy stops the whole run. Show the failing log tail (`gh run view <id> --log-failed | tail -50`) and offer the rollback from the deploy notes. Leave the remaining PRs unmerged.

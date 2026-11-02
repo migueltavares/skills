@@ -1,0 +1,6 @@
+interface:
+  display_name: "mig-orchestrator"
+  short_description: "Run an issue with cheaper models, reviewed, to a PR"
+  default_prompt: "Use $mig-orchestrator on issue #42."
+policy:
+  allow_implicit_invocation: true

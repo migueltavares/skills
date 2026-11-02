@@ -66,7 +66,7 @@ git rev-list <headRefOid>..<branch>          # local
 git rev-list <headRefOid>..origin/<branch>   # remote, if it still exists
 ```
 
-When git reports `<headRefOid>` as an unknown revision, fetch it first with `git fetch origin pull/<n>/head`. When either check lists commits, create `<branch>-followup` from `origin/<default branch>`, cherry-pick them, push, and open a PR that names the original. The old branch stays until that PR exists.
+When git reports `<headRefOid>` as an unknown revision, fetch it first with `git fetch origin pull/<n>/head`. When either check lists commits, create `<branch>-followup` from `origin/<default branch>`, cherry-pick them, push, and open a PR that names the original. In T3 Code, link it with `link_pull_request`. The old branch stays until that PR exists.
 
 **5. Remove worktrees.** For each worktree on a merged branch:
 - Skip it when `git -C <path> status --porcelain` shows changes. It goes in the loose ends line.

@@ -8,11 +8,19 @@
   },
   "repository": "https://github.com/migueltavares/skills",
   "license": "MIT",
-  "keywords": ["skills", "pull-requests", "merge", "handoff", "code-review", "laravel"],
+  "keywords": [
+    "skills",
+    "pull-requests",
+    "merge",
+    "handoff",
+    "code-review",
+    "laravel"
+  ],
   "skills": [
     "./skills/mig-laravel-guardrails",
     "./skills/mig-merge",
     "./skills/mig-merged",
+    "./skills/mig-orchestrator",
     "./skills/mig-relay",
     "./skills/mig-review-findings"
   ]

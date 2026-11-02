@@ -33,6 +33,7 @@ Call a skill as `/mig-merge 12` in Claude Code, or `$mig-merge 12` in Codex.
 | [mig-mockup](skills/mig-mockup/SKILL.md) | `/mig-mockup pricing page` | Builds 2 or 3 HTML mockups, checks them at desktop and phone widths, and records the chosen design before any app code changes. |
 | [mig-my-turn](skills/mig-my-turn/SKILL.md) | other skills hand over to it | Gives the steps only you can run, one at a time, with the machine named for each, and checks every result. |
 | [mig-audit-codebase](skills/mig-audit-codebase/SKILL.md) | `/mig-audit-codebase`, or add `invisible` | Audits security, data safety, performance and reliability, verifies each finding, files issues, and writes the work order. |
+| [mig-pt-pt](skills/mig-pt-pt/SKILL.md) | loads for any Portuguese text | Writes and reviews European Portuguese: vocabulary, grammar, formats and AI tells, with a per-project glossary. |
 
 How they chain:
 
@@ -55,7 +56,7 @@ Server names, paths and client names stay in each project's files. The skills ho
 
 ## Planned
 
-`mig-pt-pt`, `mig-seo-audit`, `mig-memory-evolution`.
+`mig-seo-audit`, `mig-memory-evolution`.
 
 ## Credits
 

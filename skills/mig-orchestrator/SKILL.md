@@ -66,12 +66,14 @@ Implementers edit files and run checks. They never stage, commit, push or open a
 For each step, after its implementer reports:
 
 1. Read `git status` and the full `git diff`. Hand a diff over about 400 lines to a read-only subagent for a first pass, and keep the verdict yourself.
-2. Run the step's Verify command and the project's checks yourself.
+2. Run the step's Verify command yourself, after the implementers have stopped.
 3. Check the diff against the contract and the fence.
 
 A step that misses its contract goes back with specific corrections, at most twice. After that, do it yourself. Security logic (authorization, permissions, payments, secrets, uploads, anything that touches personal data) is written or rewritten by the main thread.
 
-Done when every step's Verify passes in your own run.
+Then run the full test suite once, and every other check CI runs (lint, static analysis, dependency audit), so a push never fails on a check nobody ran locally.
+
+Done when every step's Verify, the full suite and the CI checks pass in your own run.
 
 ## 6. Commit
 

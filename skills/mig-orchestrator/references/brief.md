@@ -14,7 +14,7 @@ Verify: <exact command> exits 0. <Name the new test that fails before the change
 Fence: change only <files or areas>. Leave <the adjacent thing> alone.
 Stop and ask if: a named file or symbol is missing or has moved; the contract needs changes outside the fence; a test outside this step goes red; Verify passes for a reason the contract doesn't explain.
 
-Rules: do not stage, commit, push or open a PR. Run one test suite at a time, since the test database is shared. <Project rules that apply.>
+Rules: do not stage, commit, push or open a PR. Run only the test files for this step, never the full suite, since other implementers may be testing at the same time and fakes such as Storage::fake share one directory. <Project rules that apply.>
 Report: the files you changed, the Verify output, and anything you could not do, with the reason.
 ```
 

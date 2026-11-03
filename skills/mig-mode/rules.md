@@ -1,6 +1,6 @@
 # Working rules (mig-mode)
 
-These rules apply in every session. A project's own instructions add to them.
+These rules apply in every session. A project's own instructions add to them, and win where the two disagree, such as a project that works directly on main.
 
 ## Writing
 

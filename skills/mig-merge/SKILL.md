@@ -67,8 +67,9 @@ The edit goes in a small docs PR. Ask the user whether to add it to the end of t
 
 1. A PR stacked on another PR's branch goes after that PR.
 2. A PR with migrations goes before PRs whose code needs them.
-3. PRs that touch the same files go in the order they were opened.
-4. Everything else, oldest first.
+3. Across repos, the side that accepts both the old and the new shape of shared data deploys first, usually the API before its clients.
+4. PRs that touch the same files go in the order they were opened.
+5. Everything else, oldest first.
 
 Show the order as a numbered list, one line of reasoning per PR, then start.
 

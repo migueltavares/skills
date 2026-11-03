@@ -79,11 +79,13 @@ Then run `git worktree prune`.
 - Local: when `git merge-base --is-ancestor <branch> <headRefOid>` succeeds, `git branch -D <branch>`. Squash merges make `git branch -d` refuse, and the ancestor check is what makes `-D` safe.
 - Remote: `git push origin --delete <branch>`, unless `git ls-remote --heads origin <branch>` shows GitHub already removed it.
 
-Done when every merged PR's branch and clean worktrees are gone, every stacked PR targets the default branch, and the main checkout is on the updated default branch.
+**7. Close the issues.** For each issue the PR body names with `Closes #N`, `gh issue view <N> --json state` should show `CLOSED`. Close a fully delivered issue that stayed open with `gh issue close <N> --comment "Delivered in #<n>."`. On a partly delivered one, comment with what the PR did and what is left, and leave it open.
+
+Done when every merged PR's branch and clean worktrees are gone, its issues are closed or commented, every stacked PR targets the default branch, and the main checkout is on the updated default branch.
 
 ## Report and hand off
 
-One line per PR: number, merge commit, branches deleted, worktrees removed, PRs retargeted, late commits moved. Then one line:
+One line per PR: number, merge commit, branches deleted, worktrees removed, PRs retargeted, late commits moved, issues closed. Then one line:
 
 ```text
 Loose ends: <dirty worktrees with paths> | <retargeted PRs waiting for CI> | <follow-up PRs opened> | none

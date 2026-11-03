@@ -32,6 +32,8 @@ Reply with the output, or "done".
 ```
 
 - Use the alias or name the project's AGENTS.md gives the machine. A command that has to run from a directory starts with `cd <dir> &&`.
+- Commands that open a pager swallow the next pasted line. Write `systemctl --no-pager`, `git --no-pager` and `journalctl --no-pager`.
+- When the user logs in as root, run app commands as the app's user (`sudo -u <user> php artisan ...`). A cache or log file that root creates can be unreadable to the app, and a root-owned config cache has taken a site down with a 500.
 - Before a step that is hard to undo (a DNS change, a delete, a production restart, a data change), say what it changes and how to undo it, and wait for a yes.
 
 ## 3. Check every reply

@@ -19,17 +19,15 @@ Do everything the agent can do before handing over: local setup, config files, m
 
 ## 2. One step at a time
 
-Give one step per message, in this shape:
+Give one step per message, written as ordinary Markdown with these parts in order:
 
-```text
-Step <n> of <total>: <what this step achieves>
-Where: <your computer | the server <alias> | <dashboard> > <page> | GitHub > <repo> > Settings>
+1. A bold heading line: **Step <n> of <total>: <what this step achieves>**
+2. `Where:` and the place it runs: your computer, the server `<alias>`, `<dashboard> > <page>`, or `GitHub > <repo> > Settings`.
+3. The exact clicks as plain text (`Menu > Submenu > Button`), or the exact commands with full paths.
+4. `Expected:` and the output or what the screen shows.
+5. The closing line: Reply with the output, or "done".
 
-<the exact commands, with full paths, or the exact clicks: Menu > Submenu > Button>
-
-Expected: <the output or what the screen shows>
-Reply with the output, or "done".
-```
+Only commands go in a code block, fenced and tagged `bash`. The heading, `Where:`, clicks, `Expected:` and the closing line stay outside any code block, because a whole step inside a fence renders as one grey box with the Markdown shown raw.
 
 - Use the alias or name the project's AGENTS.md gives the machine. A command that has to run from a directory starts with `cd <dir> &&`.
 - Commands that open a pager swallow the next pasted line. Write `systemctl --no-pager`, `git --no-pager` and `journalctl --no-pager`.

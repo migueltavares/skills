@@ -79,7 +79,8 @@ fi
 # The cache file can also appear during the command itself. Artisan accepts
 # abbreviations, so co*:ca* is config:cache. optimize caches the config too;
 # optimize:clear does not.
-if printf '%s' "$norm" | grep -Eiq 'artisan[^;&|]*[[:space:]]+(co[a-z]*:ca[a-z]*|optimize)([[:space:];&|]|$)'; then
+# Same separators as rule 1, so Artisan::call(config:cache) in tinker counts.
+if printf '%s' "$norm" | grep -Eiq 'artisan[^;&|]*[[:space:](,]+(co[a-z]*:ca[a-z]*|optimize)([^a-z:]|$)'; then
     deny "this command caches the config and runs tests, so the tests would ignore phpunit.xml and run against the real database. Run the tests in a separate command, after php artisan config:clear."
 fi
 

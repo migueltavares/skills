@@ -1,6 +1,6 @@
 {
   "name": "mig-skills",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Agent skills for repos where a merge deploys: orchestrate issues across models, merge PRs one deploy at a time, hand off between threads, verify reviews, audit apps and sites, write European Portuguese, and keep agents from wiping Laravel databases.",
   "author": {
     "name": "Miguel Tavares",

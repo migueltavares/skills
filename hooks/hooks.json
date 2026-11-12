@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/skills/mig-laravel-guardrails/scripts/laravel-db-guard.sh",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/skills/mig-laravel-guardrails/scripts/laravel-db-guard.sh\"",
             "timeout": 10
           }
         ]

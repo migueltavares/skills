@@ -1,6 +1,6 @@
 ---
 name: mig-my-turn
-description: Walk the developer through steps only they can run, such as a server, a dashboard, DNS or a secret, one step at a time, naming the machine for each command. Use when a task needs access the agent lacks, for a manual deploy, or for /mig-my-turn.
+description: Walk the developer through steps only they can run, such as a server, a dashboard, DNS or a secret, one step at a time, naming the machine for each command. Use when a task needs access the agent lacks, for a manual deploy, a cutover or go-live, production checks, or for /mig-my-turn.
 metadata:
   credits:
     - skill: wizard
@@ -15,24 +15,32 @@ Some steps need the developer's hands: a server the agent can't reach, a dashboa
 
 ## 1. Do your part first
 
-Do everything the agent can do before handing over: local setup, config files, migrations on a test database, scripts the user will run. Then list only what needs the user, with one line each on why the agent can't do it.
+Do everything the agent can do before handing over: local setup, config files, migrations on a test database, scripts the user will run, and checks of public URLs, DNS records and TLS certificates (`curl -sI`, `dig`). When a browser tool that uses the user's own signed-in browser is available (Claude in Chrome), fill in dashboards yourself and ask for a yes before each submit.
+
+Then tell the user how many steps need them and, in one line each, why the agent can't do them (no remote access, a hook blocks it, a login only they have). Leave the step contents for the steps themselves.
 
 ## 2. One step at a time
 
-Give one step per message, written as ordinary Markdown with these parts in order:
+Give one step per message. A step happens in one place and holds at most about 3 actions, and at most one that is hard to undo. A question for the user goes in its own message, never inside a step. Write each step as ordinary Markdown with these parts in order:
 
 1. A bold heading line: **Step <n> of <total>: <what this step achieves>**
 2. `Where:` and the place it runs: your computer, the server `<alias>`, `<dashboard> > <page>`, or `GitHub > <repo> > Settings`.
 3. The exact clicks as plain text (`Menu > Submenu > Button`), or the exact commands with full paths.
-4. `Expected:` and the output or what the screen shows.
+4. `Expected:` and the output or what the screen shows. Read the script, route or config the step runs before writing it. When you can't check it, write "Expected (guess):".
 5. The closing line: Reply with the output, or "done".
 
-Only commands go in a code block, fenced and tagged `bash`. The heading, `Where:`, clicks, `Expected:` and the closing line stay outside any code block, because a whole step inside a fence renders as one grey box with the Markdown shown raw.
+Only commands go in a code block, fenced and tagged `bash`. The heading, `Where:`, clicks, `Expected:` and the closing line stay outside any code block, because a whole step inside a fence renders as one grey box with the Markdown shown raw. A command that prompts for input (`read -rsp`, `mysql -p`, `sudo`) goes in a block of its own, since text pasted after it lands in the prompt.
 
 - Use the alias or name the project's AGENTS.md gives the machine. A command that has to run from a directory starts with `cd <dir> &&`.
 - Commands that open a pager swallow the next pasted line. Write `systemctl --no-pager`, `git --no-pager` and `journalctl --no-pager`.
-- When the user logs in as root, run app commands as the app's user (`sudo -u <user> php artisan ...`). A cache or log file that root creates can be unreadable to the app, and a root-owned config cache has taken a site down with a 500.
+- When the user logs in as root, run app commands and edit files in the app's folder as the app's user (`sudo -u <user> php artisan ...`, `sudo -u <user> nano .env`). A cache, log or config file that root creates can be unreadable to the app, and a root-owned config cache has taken a site down with a 500.
+- A command that asks for a password (`mysql -p`, `sudo`) needs the user to have that password on that machine. Confirm it first, or use a login that needs none (`sudo mysql`, a `~/.my.cnf`).
+- A multi-line script the user pastes starts with `set -euo pipefail`, so it stops at the first error.
 - Before a step that is hard to undo (a DNS change, a delete, a production restart, a data change), say what it changes and how to undo it, and wait for a yes.
+
+## Leave working things alone
+
+Before a step that changes something that works today (keys, bucket settings, a package upgrade, a server config), say what it fixes and what happens if it's skipped, and offer to skip it. Before replacing a credential, list every reader and writer of it (backups, restores, CI, other apps), and cover each one in the steps.
 
 ## 3. Check every reply
 

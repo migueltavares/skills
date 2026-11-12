@@ -15,12 +15,12 @@ Both override files use the same rows: `- <Role>: <model id>, <option>=<value>`.
 | Role | Default | When it's unavailable |
 | --- | --- | --- |
 | Orchestrate: plan, judge, security logic, commit | The main thread, Claude Opus 5.5 | The strongest model available |
-| Implement a step | GPT-6.1 Sol, reasoning medium | Claude Sonnet 5.5 |
+| Implement a step | Claude Sonnet 5.5, effort medium | GPT-6.1 Sol, reasoning medium |
 | Mechanical work: renames, copy edits, translation drafts, test scaffolding | GPT-6.1 Terra, reasoning low (trial, below) | GPT-6.1 Sol, reasoning low |
 | Read-only discovery: find files, map callers | Claude Haiku 5.5 | Claude Sonnet 5.5 |
-| Independent review | The other provider from the implementer: Claude Opus 5.5 after a Codex implementer, GPT-6.1 Sol at high after a Claude one | A fresh-context subagent on the same model |
+| Independent review | The other provider from whoever wrote that part of the diff: Claude Opus 5.5 for code Sol wrote, GPT-6.1 Sol at high for code Sonnet or the main Claude thread wrote | A fresh-context subagent on the same model, reported as same-provider |
 
-Sol runs at medium because high was slow for little gain on these tasks.
+Sonnet implements by default because Sol at high was slow for little gain on these tasks. When Sol implements, it runs at medium.
 
 ## The Terra trial
 

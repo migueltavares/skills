@@ -60,19 +60,30 @@ Task: #<N> <title>. <Required behaviour, including any scope change from the che
 Where: <files and symbols as path:line>.
 Done when: <observable behaviour>, and <the project's check commands> are green.
 Stop and ask if: <a named file or symbol is missing> / <the fix needs changes outside this scope> / <an unrelated test goes red>.
-Workflow: branch <name> from origin/<default branch>. <Model and delegation rules from the project's instructions>. Open a PR with "Closes #<N>" (one "closes" per issue). Mark #<N> done in <plan file> in the same PR. Never push to <default branch>.
+Workflow: <the project's workflow from AGENTS.md>. <Model and delegation rules from the project's instructions>. Mark #<N> done in <plan file> in the same commit or PR.
 Lessons that apply: <only the ones that bear on this task>.
 After this: <the remaining order, short>.
 Start with #<N>.
 ```
 
-Carry only the last step. History lives in the plan file, which the next thread updates in its own PR. Every path and command in the prompt must exist, and no secret goes in it.
+Write the Workflow line from the project's AGENTS.md. When it says nothing, use the default: "Branch <name> from origin/<default branch>. Open a PR with "Closes #<N>" (one "closes" per issue). Never push to <default branch>." A project that commits straight to the default branch gets that instead, never the branch and PR wording.
+
+Carry only the last step. History lives in the plan file, which the next thread updates. Every path and command in the prompt must exist, and no secret goes in it.
+
+Keep "Lessons that apply" short. A lesson that has already appeared in three prompts is a project rule: offer to move it into AGENTS.md, and from then on cite AGENTS.md instead of repeating it.
 
 ## 4. Hand over
 
 1. Print the block.
-2. Print one line: `Loose ends: <uncommitted worktrees> | <open PRs> | <checks not run> | none`.
+2. Print the loose ends: uncommitted worktrees, untracked files, open PRs, checks not run. Give each one a verdict, either "fix now: <what you would do>" or "leave, because <reason>". Print `Loose ends: none` when there are none.
 3. Send a push notification when the host has one (`PushNotification` in Claude Code): "<project>: next prompt ready, #<N>".
-4. Ask: "Open the next thread? Reply go."
+4. Ask: "Open the next thread? Reply go." When any loose end says "fix now", ask instead: "Reply go to fix the loose ends marked fix now and open the next thread."
 
-On "go" in T3 Code, open a thread in the same project with `t3_thread_launch`, the prompt as its first message, and the same workspace strategy as this thread (a new worktree when this thread runs in one). Outside T3 Code, the prompt is ready to paste.
+On "go", fix the loose ends marked "fix now" first. Then, in T3 Code, open a thread in the same project with `t3_thread_launch`:
+- the prompt as its first message;
+- `modelSelection` set to the orchestrator role from the project's `## Models` section or `~/.agents/mig/models.md`, else this thread's model, with the effort the prompt asks for;
+- the same workspace strategy as this thread (a new worktree when this thread runs in one).
+
+Outside T3 Code, the prompt is ready to paste.
+
+**Standing permission.** When the user, or the prompt this thread started from, says to keep going without asking, skip the question and launch. Copy the permission into the new prompt as its own line ("Standing permission: launch the next thread without asking, until an item is blocked on the user"), so it carries forward. Stop at the first item blocked on the user, or when the user withdraws it.

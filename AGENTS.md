@@ -14,6 +14,7 @@ Public agent skills for Claude Code and Codex. Each skill lives in `skills/mig-<
 - Follow the writing-for-agents and unslop skills: no em dashes, straight quotes, sentence case headings.
 - Server names, paths, and client or project names stay out of every file here. Skills read those facts from each project's AGENTS.md.
 - Skills treat a project's AGENTS.md as the source of project facts, and its CLAUDE.md as a pointer to it.
+- Skills don't depend on other authors' skills. Unslop is the one exception, installed by `mig-mode`, never copied.
 - Credit every source in `metadata.credits`. Material from gtapps/skills is used with the author's permission.
 
 ## Checks

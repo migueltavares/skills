@@ -28,6 +28,7 @@ Read the project's AGENTS.md, the README and the deploy setup. Settle:
 - **Mode.** Normal, or **invisible**: fixes the app's users never notice, with no changes to workflows, permissions, screens or wording. Use invisible for apps whose staff are already trained on the current behaviour.
 - **What is in scope**: the app, its admin panel, its API, background jobs, the server config in the repo.
 - Anything the user already knows about or wants left alone.
+- Decisions the owner already made. Read the recorded ones (AGENTS.md, `docs/decisions.md`, issues closed as a decision or "won't fix") and don't propose those changes again unless the user asks. A finding that only repeats one goes in the report as "settled", not in the table.
 - Policies that decide whether a fix is welcome, asked in one batch when AGENTS.md doesn't answer them: the MFA and password policy for admins, the CI time budget, which monitoring, error reporting and backup tools already run, and whether a new service or a new paid tool is acceptable.
 
 ## 2. Map the app

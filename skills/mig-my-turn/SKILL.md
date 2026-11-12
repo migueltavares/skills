@@ -33,6 +33,7 @@ Only commands go in a code block, fenced and tagged `bash`. The heading, `Where:
 
 - Use the alias or name the project's AGENTS.md gives the machine. A command that has to run from a directory starts with `cd <dir> &&`.
 - Commands that open a pager swallow the next pasted line. Write `systemctl --no-pager`, `git --no-pager` and `journalctl --no-pager`.
+- Write the binary the project's AGENTS.md names for that machine (`php8.4`, `php84`, `/usr/bin/php8.4`), never plain `php`. Shared servers often keep an older default, which fails Composer's platform check. When AGENTS.md names none, ask, then record the answer there.
 - When the user logs in as root, run app commands and edit files in the app's folder as the app's user (`sudo -u <user> php artisan ...`, `sudo -u <user> nano .env`). A cache, log or config file that root creates can be unreadable to the app, and a root-owned config cache has taken a site down with a 500.
 - A command that asks for a password (`mysql -p`, `sudo`) needs the user to have that password on that machine. Confirm it first, or use a login that needs none (`sudo mysql`, a `~/.my.cnf`).
 - A multi-line script the user pastes starts with `set -euo pipefail`, so it stops at the first error.

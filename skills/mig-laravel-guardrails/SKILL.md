@@ -22,7 +22,7 @@ Agents with a cached config have run `RefreshDatabase` against real local databa
 The guard is `scripts/laravel-db-guard.sh` in this skill's directory, run before every shell command in Claude Code and Codex, in every permission mode. It blocks:
 
 - `migrate:fresh`, `migrate:refresh`, `migrate:reset` and `db:wipe`, in any form artisan accepts: quoted, abbreviated (`migrate:fr`), inside ssh commands, or through `Artisan::call` in tinker.
-- Test runs while `bootstrap/cache/config.php` exists, since a cached config ignores `phpunit.xml` and the environment.
+- Test runs while `bootstrap/cache/config.php` exists, since a cached config ignores `phpunit.xml` and the environment, and test runs in the same command as `config:cache` or `optimize`, which create that file.
 - Test runs whose database is not SQLite in memory or a database whose name contains "test". The guard reads `phpunit.xml` as XML, so commented-out lines don't count, and accepts `DB_CONNECTION=sqlite DB_DATABASE=:memory:` written directly in front of the test command.
 
 Steps:
@@ -46,4 +46,6 @@ Done when the guard test and the full suite pass, and the change is in a PR.
 
 ## Proving the guard
 
-Prove it only through its own test, which calls `guardTestDatabase` directly with fake values. Pointing the suite at a real database to watch the guard fire puts that database at risk if the guard is wrong.
+Prove it only through its own test, which calls `guardTestDatabase` directly with fake values. Don't improvise a live proof: no `config:cache` before a test run, no unreachable or scratch database to watch the guard fire, no suite run aimed at a real database. Each of those puts a database at risk if the guard is wrong, and the direct test already covers them.
+
+A project may make the guard stricter, such as one exact database name. Keep the `DB_URL` check, and refuse parallel runs as [references/repo-guard.md](references/repo-guard.md) explains.

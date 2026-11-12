@@ -1,6 +1,6 @@
 ---
 name: mig-review-findings
-description: Verify the review comments on a pull request against the current code, then fix only the confirmed ones. Use for /mig-review-findings <PR>, when a PR has bot or human review findings to handle, and from mig-merge or mig-orchestrator before a merge.
+description: Verify review findings against the current code, then fix only the confirmed ones. Findings can be PR review comments, a "Commit security review found..." notification, another model's review, or a pasted list. Use for /mig-review-findings <PR>, when a PR or a commit has bot, human or security review findings to handle, and from mig-merge or mig-orchestrator before a merge.
 metadata:
   credits:
     - skill: review-findings
@@ -17,11 +17,18 @@ metadata:
 
 Every review comment is a hypothesis. Settle it from the current code and real behavior, never from the reviewer's quoted snippet or line number. Fix what holds up, answer what doesn't, and keep the PR at the size its goal needs.
 
-Input: a PR number, or the PR for the current branch (`gh pr view --json number`). Add `report` to stop after classifying.
+Input, one of:
+
+- a PR number, or the PR for the current branch (`gh pr view --json number`);
+- a list of findings from any other source: a background security review notification ("Commit security review found..."), another model's review, or text the user pasted. These have no PR threads, so step 1 takes the list as given and step 4 skips the thread replies.
+
+Add `report` to stop after classifying.
 
 ## 1. Collect
 
-Read every review thread, review body and PR comment:
+For a list of findings, number them as given and go to the ordering below.
+
+For a PR, read every review thread, review body and PR comment:
 
 ```bash
 gh api graphql -F o=<owner> -F r=<repo> -F n=<number> -f query='
@@ -77,15 +84,15 @@ With `report`, stop here.
 
 1. Fix the Confirmed findings and the valid part of the Partial ones. Everything else stays as it is.
 2. Run the checks the project's AGENTS.md (or CLAUDE.md, or CI workflow) names. A red check stops here, with its output shown.
-3. Commit with a message that names what was fixed, then push the PR branch with a plain `git push`.
-4. Reply on each thread, then resolve it:
+3. Commit with a message that names what was fixed. On a PR branch, push with a plain `git push`. Outside a PR, follow the project's workflow for where the commit goes.
+4. On a PR, reply on each thread, then resolve it:
    - Fixed: `Fixed in <sha>: <one line>`.
    - Refuted or Out of scope: the reason in one or two sentences. For Out of scope, say it is listed as a follow-up.
 
    Reply with `gh api repos/<owner>/<repo>/pulls/<number>/comments/<databaseId>/replies -f body='<text>'`. Resolve with the GraphQL mutation `resolveReviewThread(input:{threadId:"<id>"})`.
 5. Leave Needs investigation threads open. List them numbered and stop for the user, who answers like "1. agree, 2. skip because ...".
 
-Done when every thread is resolved or listed for the user, and the checks are green on the pushed head.
+Done when every finding is fixed, answered or listed for the user, every PR thread is resolved or listed, and the checks are green.
 
 ## Finish
 

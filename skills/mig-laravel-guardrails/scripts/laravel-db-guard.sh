@@ -7,7 +7,9 @@
 #      form artisan accepts: quoted, split across lines, abbreviated
 #      (migrate:fr), inside ssh commands, or through Artisan::call in tinker.
 #   2. Blocks test runs while bootstrap/cache/config.php exists, because a cached
-#      config ignores phpunit.xml and the environment.
+#      config ignores phpunit.xml and the environment. Also blocks a test run in
+#      the same command as config:cache or optimize, which create that file
+#      after this check has looked.
 #   3. Blocks test runs unless the database is SQLite in memory or a database
 #      whose name contains "test": set by phpunit.xml (read as XML, so
 #      commented-out lines don't count) or by environment assignments directly
@@ -72,6 +74,14 @@ done
 
 if [ -f "$root/bootstrap/cache/config.php" ]; then
     deny "bootstrap/cache/config.php exists, so tests would ignore phpunit.xml and run against the real database. Run php artisan config:clear first, then run the tests again."
+fi
+
+# The cache file can also appear during the command itself. Artisan accepts
+# abbreviations, so co*:ca* is config:cache. optimize caches the config too;
+# optimize:clear does not.
+# Same separators as rule 1, so Artisan::call(config:cache) in tinker counts.
+if printf '%s' "$norm" | grep -Eiq 'artisan[^;&|]*[[:space:](,]+(co[a-z]*:ca[a-z]*|optimize)([^a-z:]|$)'; then
+    deny "this command caches the config and runs tests, so the tests would ignore phpunit.xml and run against the real database. Run the tests in a separate command, after php artisan config:clear."
 fi
 
 # A safe pair of values: SQLite in memory, or any database named for testing.

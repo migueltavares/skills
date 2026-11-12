@@ -28,6 +28,7 @@ Read the project's AGENTS.md, the README and the deploy setup. Settle:
 - **Mode.** Normal, or **invisible**: fixes the app's users never notice, with no changes to workflows, permissions, screens or wording. Use invisible for apps whose staff are already trained on the current behaviour.
 - **What is in scope**: the app, its admin panel, its API, background jobs, the server config in the repo.
 - Anything the user already knows about or wants left alone.
+- Policies that decide whether a fix is welcome, asked in one batch when AGENTS.md doesn't answer them: the MFA and password policy for admins, the CI time budget, which monitoring, error reporting and backup tools already run, and whether a new service or a new paid tool is acceptable.
 
 ## 2. Map the app
 
@@ -57,7 +58,7 @@ In invisible mode, drop or rewrite any fix that changes what users see or do, an
 
 ## 5. Agree the list
 
-Show one table: severity, finding, evidence, proposed fix, and whether the fix needs the user (credentials, server access, legal or business decisions). Wait for the user's OK, and apply their edits, before filing anything.
+Show one table: severity, finding, evidence, proposed fix, whether the fix needs the user (credentials, server access, legal or business decisions), and whether it changes something that works today or adds a service, a tool or CI time. Propose the fix that fits the policies from step 1, and offer the stricter one as an option, not the default. Wait for the user's OK, and apply their edits, before filing anything.
 
 ## 6. File the issues
 
@@ -75,4 +76,4 @@ Write `docs/handoff/<YYYY-MM-DD>-audit.md`, ordered by these rules:
 
 In a Laravel repo without the test database guard, the first item adds it with `mig-laravel-guardrails`.
 
-Then hand over the first item with `mig-relay`.
+Commit the work order on its own branch and open a docs PR for it, so it reaches the default branch before the first fix. Then hand over the first item with `mig-relay`.

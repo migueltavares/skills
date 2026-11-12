@@ -26,14 +26,14 @@ Call a skill as `/mig-merge 12` in Claude Code, or `$mig-merge 12` in Codex.
 | [mig-merge](skills/mig-merge/SKILL.md) | `/mig-merge 12 14`, or `/mig-merge` to choose | Merges PRs in a safe order with squash, waits for each deploy before the next, then cleans up and hands off. |
 | [mig-merged](skills/mig-merged/SKILL.md) | `/mig-merged 12` after you merge on GitHub | Verifies the merge, retargets stacked PRs, rescues late commits, removes merged worktrees and branches. |
 | [mig-relay](skills/mig-relay/SKILL.md) | `/mig-relay` | Finds the next item in the work order, checks it still needs doing, and writes the prompt for the next thread. |
-| [mig-review-findings](skills/mig-review-findings/SKILL.md) | `/mig-review-findings 12` | Checks each review comment against the code, fixes the confirmed ones, and answers the rest. |
+| [mig-review-findings](skills/mig-review-findings/SKILL.md) | `/mig-review-findings 12` | Checks each review finding against the code (PR comments, security review notices, another model's review), fixes the confirmed ones, and answers the rest. |
 | [mig-laravel-guardrails](skills/mig-laravel-guardrails/SKILL.md) | `/mig-laravel-guardrails` once | Blocks `migrate:fresh`, `db:wipe` and test runs that could reach a real database, in Claude Code and Codex. |
 | [mig-orchestrator](skills/mig-orchestrator/SKILL.md) | `/mig-orchestrator #42` | Checks the issue still holds, briefs cheaper models with contracts, judges their work from git, gets a review from the other provider, and opens the PR. |
 | [mig-mode](skills/mig-mode/SKILL.md) | `/mig-mode setup` once | Writes the always-on working rules, and unslop, into global CLAUDE.md and Codex's AGENTS.md. |
-| [mig-mockup](skills/mig-mockup/SKILL.md) | `/mig-mockup pricing page` | Builds 2 or 3 HTML mockups, checks them at desktop and phone widths, and records the chosen design before any app code changes. |
+| [mig-mockup](skills/mig-mockup/SKILL.md) | `/mig-mockup pricing page` | Builds 2 or 3 HTML mockups next to the current page, checks them at desktop and phone widths with a bundled script, and records the chosen design before any app code changes. |
 | [mig-my-turn](skills/mig-my-turn/SKILL.md) | other skills hand over to it | Gives the steps only you can run, one at a time, with the machine named for each, and checks every result. |
 | [mig-audit-codebase](skills/mig-audit-codebase/SKILL.md) | `/mig-audit-codebase`, or add `invisible` | Audits security, data safety, performance and reliability, verifies each finding, files issues, and writes the work order. |
-| [mig-pt-pt](skills/mig-pt-pt/SKILL.md) | loads for any Portuguese text | Writes and reviews European Portuguese: vocabulary, grammar, formats and AI tells, with a per-project glossary. |
+| [mig-pt-pt](skills/mig-pt-pt/SKILL.md) | loads for any Portuguese text | Writes and reviews European Portuguese: vocabulary, grammar, formats and AI tells, with a per-project glossary and a script that flags Brazilian forms. |
 | [mig-seo-audit](skills/mig-seo-audit/SKILL.md) | `/mig-seo-audit https://example.pt` | Audits a public site and sets up SEO, AI search, analytics with consent, Cloudflare, Search Console and the contact form. |
 | [mig-memory-evolution](skills/mig-memory-evolution/SKILL.md) | `/mig-memory-evolution` | Finds rules repeated across project memories and gives each one home: a skill, the global rules, a hook or a checklist. |
 

@@ -25,4 +25,5 @@ These rules apply in every session. A project's own instructions add to them, an
 ## Handoffs
 
 - A prompt meant for another thread or agent goes in one fenced `text` block, ready to paste.
+- Steps the user runs by hand (a server, a dashboard, DNS) go one per message, through `mig-my-turn`. Wait for each result before the next step.
 - Project facts live in the project's AGENTS.md, and CLAUDE.md points to it.

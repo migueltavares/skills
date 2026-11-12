@@ -21,11 +21,13 @@ abstract class TestCase extends BaseTestCase
         $app = parent::createApplication();
 
         $connection = $app['config']->get('database.default');
+        $settings = $app['config']->get("database.connections.{$connection}", []);
 
         static::guardTestDatabase(
             $connection,
-            $app['config']->get("database.connections.{$connection}.database"),
+            $settings['database'] ?? null,
             $app->configurationIsCached(),
+            $settings['url'] ?? null,
         );
 
         return $app;
@@ -35,10 +37,14 @@ abstract class TestCase extends BaseTestCase
      * Tests run only on SQLite in memory or a database named for testing,
      * so RefreshDatabase can never drop real tables.
      */
-    public static function guardTestDatabase(?string $connection, ?string $database, bool $configCached): void
+    public static function guardTestDatabase(?string $connection, ?string $database, bool $configCached, ?string $url = null): void
     {
         if ($configCached) {
             throw new RuntimeException('The config is cached, so tests would ignore phpunit.xml and use the real database. Run `php artisan config:clear`, then run the tests again.');
+        }
+
+        if ($url !== null && $url !== '') {
+            throw new RuntimeException('DB_URL is set, and it replaces the database name when the connection opens. Unset DB_URL for tests, then run them again.');
         }
 
         $inMemory = $connection === 'sqlite' && $database === ':memory:';
@@ -50,6 +56,10 @@ abstract class TestCase extends BaseTestCase
     }
 }
 ```
+
+`DB_URL` matters because Laravel reads the URL when the connection opens and lets it override the `database` value the guard checked. Add `<env name="DB_URL" value=""/>` to `phpunit.xml` when the app's `.env` sets one.
+
+Parallel runs (`php artisan test --parallel`) are safe with this guard: each worker switches to `<database>_test_<n>` after the guard has run, and that name still contains "test". A project that tightens the guard to one exact database name must also refuse parallel runs (check `$_SERVER['LARAVEL_PARALLEL_TESTING']`), because the suffixed name no longer matches.
 
 Laravel 10 and earlier keep `createApplication()` in `tests/CreatesApplication.php`. Put the `guardTestDatabase(...)` call there, just before `return $app;`, and the static method in `TestCase`.
 
@@ -79,6 +89,10 @@ it('stops on a real database', function () {
 
 it('stops when the config is cached', function () {
     TestCase::guardTestDatabase('sqlite', ':memory:', true);
+})->throws(RuntimeException::class);
+
+it('stops when a database URL is set', function () {
+    TestCase::guardTestDatabase('mysql', 'testing', false, 'mysql://root@127.0.0.1/app');
 })->throws(RuntimeException::class);
 
 it('allows SQLite in memory and test databases', function () {

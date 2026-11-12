@@ -17,7 +17,7 @@ metadata:
 
 A merged PR leaves branches, worktrees and sometimes a stacked PR pointing at a branch that is about to disappear. This skill clears all of it, so the checkout sits on an up-to-date default branch and the next step can start.
 
-Input: PR numbers in any form (`/mig-merged 12 14`, "PR 12 and 14", "#12, #14"). With none, find candidates: merged PRs whose head branch still exists locally or as a worktree.
+Input: PR numbers in any form (`/mig-merged 12 14`, "PR 12 and 14", "#12, #14"), optionally followed by `from mig-merge` when `mig-merge` calls it. With no numbers, find candidates: merged PRs whose head branch still exists locally or as a worktree.
 
 ```bash
 gh pr list --state merged --limit 30 --json number,headRefName,headRefOid,mergedAt
@@ -35,7 +35,7 @@ Show the candidates and clean up the ones the user confirms.
 
 ## Steps
 
-Run from the main checkout, the first entry in `git worktree list`.
+Run from the main checkout of the PR's own repo, the first entry in its `git worktree list`. When the PR belongs to a repo other than the working directory, run every step there, including step 2, with `git -C <path>` or `cd <path>`.
 
 **1. Verify.** For each PR:
 
@@ -43,9 +43,9 @@ Run from the main checkout, the first entry in `git worktree list`.
 gh pr view <n> --json state,mergedAt,mergeCommit,headRefName,headRefOid,baseRefName
 ```
 
-A PR that is not `MERGED` is skipped and reported. If the user wants the agent to merge it, that's `/mig-merge <n>`.
+A PR that is not `MERGED` is skipped and reported. When the user wants the agent to merge it, invoke `mig-merge` for it. Never merge with a bare `gh pr merge`, which skips the gate and the deploy wait.
 
-**2. Update the default branch.** `git fetch --prune origin`, switch to the default branch, `git pull --ff-only`. Uncommitted changes in the main checkout stop the run: list them and ask.
+**2. Update the default branch.** `git fetch --prune origin`, switch to the default branch, `git pull --ff-only`. Uncommitted changes in the main checkout come along when the switch and pull succeed: list them in the report. Stop and ask only when git refuses because they conflict.
 
 **3. Retarget stacked PRs.** For each merged head branch:
 
@@ -79,20 +79,16 @@ Then run `git worktree prune`.
 - Local: when `git merge-base --is-ancestor <branch> <headRefOid>` succeeds, `git branch -D <branch>`. Squash merges make `git branch -d` refuse, and the ancestor check is what makes `-D` safe.
 - Remote: `git push origin --delete <branch>`, unless `git ls-remote --heads origin <branch>` shows GitHub already removed it.
 
-**7. Close the issues.** For each issue the PR body names with `Closes #N`, `gh issue view <N> --json state` should show `CLOSED`. Close a fully delivered issue that stayed open with `gh issue close <N> --comment "Delivered in #<n>."`. On a partly delivered one, comment with what the PR did and what is left, and leave it open.
+**7. Close the issues.** For each issue the PR body names with `Closes #N`, `gh issue view <N> --json state` should show `CLOSED`. Close a fully delivered issue that stayed open with `gh issue close <N> --comment "Delivered in #<n>."`. On a partly delivered one, comment with what the PR did and what is left, and leave it open. GitHub closes an issue for phrases like "Closes part of #N" too: reopen such an issue with `gh issue reopen <N>` and the same comment.
 
 Done when every merged PR's branch and clean worktrees are gone, its issues are closed or commented, every stacked PR targets the default branch, and the main checkout is on the updated default branch.
 
 ## Report and hand off
 
-One line per PR: number, merge commit, branches deleted, worktrees removed, PRs retargeted, late commits moved, issues closed. Then one line:
-
-```text
-Loose ends: <dirty worktrees with paths> | <retargeted PRs waiting for CI> | <follow-up PRs opened> | none
-```
+One line per PR: number, merge commit, branches deleted, worktrees removed, PRs retargeted, late commits moved, issues closed. Then the loose ends. Each one names who acts and what to run, such as "you: commit or drop the changes in `<path>`" or "CI: #14 reruns after the retarget, nothing to do". Print only the parts that apply, or `Loose ends: none`.
 
 Then:
-- Called from `mig-merge`: return here. `mig-merge` hands off once, after its last PR.
+- Called with `from mig-merge`: return here. `mig-merge` hands off once, after its last PR.
 - The next step needs the user first (credentials, a server step, a decision): say exactly what, and stop.
 - Work remains in an order (a plan in `docs/handoff/`, open issues this thread was working through, a later phase): invoke `mig-relay` for the next prompt.
 - Nothing remains: stop after the report.

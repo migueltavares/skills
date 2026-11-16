@@ -64,8 +64,6 @@ If the site is behind Cloudflare, ask the user to turn on the Speed settings. Th
 - **Brotli, HTTP/3 and Early Hints**, where offered.
 - **Auto Minify** no longer exists in Cloudflare. On a small site, minifying would save 1 to 2 KB and wouldn't change the score, so a build step isn't worth adding.
 
-Also ask the user to check Security > Bots, so AI search bots and Google's tag checker aren't challenged.
-
 ## Warnings to leave alone
 
 - **Network dependency tree on font files.** With custom fonts, two font files after the HTML is the shortest chain possible. It's unscored. The only fix is dropping the fonts. Explain this and let the user decide.

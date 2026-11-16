@@ -28,7 +28,7 @@ Read the project's AGENTS.md and any earlier design decisions in `docs/handoff/`
 
 List every page and state in scope (empty, error, logged out, the landing page, each role's view) and confirm the list with the user before building.
 
-Then look at what exists today. Screenshot each current page at 1440 and 390 with `node <skill-dir>/scripts/check.mjs <url>` (`<skill-dir>` is this skill's absolute installed path), and read the live CSS for the container or wrapper width, base font size, sidebar width and brand colours. The options keep those unless the user asks to change them. When they conflict with a design doc, show both and ask which wins.
+Then look at what exists today. Screenshot each current page at 1440 and 390 with `node <skill-dir>/scripts/check.mjs <url> --out mockups/<slug>/shots` (`<skill-dir>` is this skill's absolute installed path), and read the live CSS for the container or wrapper width, base font size, sidebar width and brand colours. The options keep those unless the user asks to change them. When they conflict with a design doc, show both and ask which wins.
 
 ## 2. Build the options
 

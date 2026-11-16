@@ -79,7 +79,7 @@ Done when every item there is applied or ruled out with a reason, and the user h
 
 1. Show a summary of the changes, then commit on a branch and open a PR with deploy notes: new env vars, server rules, and anything to purge. In T3 Code, link the PR with `link_pull_request`.
 2. After the merge, walk the user through their steps with `mig-my-turn`:
-   - Search Console verification, the sitemap and Bing, from [references/search-console.md](references/search-console.md);
+   - Search Console verification, the sitemap, the page checks and Bing, from [references/search-console.md](references/search-console.md), whose Performance report section is for the user to come back to after a few weeks of data;
    - Cloudflare SSL, redirects, caching, bots and mail DNS records, from [references/cloudflare.md](references/cloudflare.md);
    - Analytics data retention set to 14 months (the default is 2), and a check in Realtime after clicking Accept in a private window;
    - env vars for the mail provider and Turnstile on the server, named but never valued;

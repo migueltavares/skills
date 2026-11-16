@@ -149,8 +149,6 @@ if (consent) {
 }
 ```
 
-GA sets `_ga` cookies on the registrable domain (`.example.com`), so the cleanup clears the host, the dotted host and the bare domain.
-
 ## Privacy Policy text
 
 Add this to the cookies section, in every language, and update "Last updated". Adjust it if the site uses strict mode.

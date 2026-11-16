@@ -19,4 +19,4 @@ For each finding give: a title, severity (high, med or low), path:line, the clai
 When you find nothing material, say "No findings" and list what you checked.
 ```
 
-Fill `<base>` with the commit the branch started from: `git merge-base HEAD origin/<the PR's base branch>`. In T3 Code, send it with `delegate_task` and `role: "review"`, targeting the reviewer model from the models table.
+Fill `<base>` with the commit the branch started from: `git merge-base HEAD origin/<the PR's base branch>`.

@@ -53,7 +53,7 @@ With no arguments it checks the usual Laravel `pt_PT` and `pt` lang folders. It 
 - Numbers `1234,56`, and `1 234,56` with a space as the thousands separator in long figures.
 - Money `12,50 €`, with a space before the euro sign. "IVA incluído" or "acresce IVA", stated once.
 - Phone `+351 912 345 678`. Postcode `1000-001 Lisboa`.
-- Tax and identity: NIF (not CPF), Cartão de Cidadão (not RG), fatura (not nota fiscal), morada (not endereço residencial, in forms).
+- Tax and identity: NIF, Cartão de Cidadão and fatura are the Portuguese documents. CPF, RG and nota fiscal are different Brazilian ones, so swap them only when the product really uses the Portuguese one, and ask when translating a fact. In forms, morada (not endereço residencial).
 
 ## AI tells in Portuguese
 

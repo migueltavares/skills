@@ -85,49 +85,13 @@ Run it at the top of the page that renders the form, before any output.
 7. Send the email. If sending fails, log the exception message (never the credentials) and respond 500 with the generic send error.
 8. On success, a fetch request gets status `success` and the success message. A plain form post gets a `303` redirect to `/?contact=sent#contact`, and that page renders the success alert.
 
-JSON response for fetch requests, detected by the `X-Requested-With: fetch` header:
+A request with the `X-Requested-With: fetch` header gets JSON instead of a page: `{"status": "success" | "error", "message": "...", "errors": {"<field>": "<message>"}}`, with `Cache-Control: no-store`. Encode `errors` as an object even when it is empty, and keep accented characters unescaped.
 
-```php
-function site_contact_wants_json(): bool
-{
-    return ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'fetch';
-}
+Send with PHPMailer (`composer require phpmailer/phpmailer`), with exceptions on:
 
-function site_contact_json_response(array $state): void
-{
-    header('Content-Type: application/json; charset=UTF-8');
-    header('Cache-Control: no-store');
-    echo json_encode([
-        'status' => $state['status'],
-        'message' => $state['message'],
-        'errors' => (object)$state['errors'],
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    exit;
-}
-```
-
-Sending with PHPMailer (`composer require phpmailer/phpmailer`):
-
-```php
-$mail = new \PHPMailer\PHPMailer\PHPMailer(true);
-$mail->CharSet = 'UTF-8';
-$mail->isSMTP();
-$mail->Host = $host;                       // smtp.resend.com
-$mail->Port = $port;                       // 465
-$mail->SMTPAuth = true;
-$mail->Username = $username;               // resend
-$mail->Password = $password;               // API key from env
-$mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS; // ENCRYPTION_STARTTLS for 587
-$mail->setFrom($from, '<Product> Website');
-$mail->addAddress($recipient);
-$mail->addReplyTo($values['email'], $values['name']);
-$mail->Subject = $email['subject'];
-$mail->isHTML(true);
-$mail->Body = $email['html'];
-$mail->AltBody = $email['text'];
-$mail->send();
-```
-
+- SMTP with the settings above. Port 465 uses `ENCRYPTION_SMTPS`, and port 587 uses `ENCRYPTION_STARTTLS`.
+- `CharSet` is `UTF-8`. From is the verified address with the name "<Product> Website".
+- `isHTML(true)`, with the HTML in `Body` and the plain text in `AltBody`.
 - Reply-To is the visitor, so hitting Reply in the mail app answers them.
 - Strip CR and LF from any value that goes into a header (subject, names).
 - If SMTP isn't configured, fall back to PHP `mail()` with the plain-text body, so the form still works on a bare host.
@@ -148,115 +112,19 @@ Render a sample to a file and show the user before committing.
 
 ## Submit without reloading
 
-```js
-const contactForm = document.querySelector("[data-contact-form]");
-const contactAlert = document.querySelector("[data-form-alert]");
+Add a submit handler to `[data-contact-form]`, only when `fetch` and `FormData` exist. Without them the plain form post still works.
 
-if (contactForm && contactAlert && window.fetch && window.FormData) {
-    const submitButton = contactForm.querySelector("button[type=\"submit\"]");
-    const submitLabel = submitButton ? submitButton.textContent : "";
+1. Prevent the default submit, disable the button and show its `data-sending-label`.
+2. POST `new FormData(form)` to the form's `action`, with the headers `X-Requested-With: fetch` and `Accept: application/json`.
+3. Clear the previous field errors, then act on the JSON:
+   - On `success`, reset the form and show the message in `[data-form-alert]` with the class `form-alert-success` and `role="status"`.
+   - On an error with a message, show it with `form-alert-error` and `role="alert"`. For each entry in `errors`, add `has-error` to the field's `.f` wrapper, append a `<small class="field-error">` with an id, and set `aria-invalid` and `aria-describedby` on the input.
+   - When the response isn't JSON or the request fails, show the form's `data-error-message`.
+4. Move focus to the alert with `focus({ preventScroll: true })`. Scroll it to the centre only when it sits under the fixed header or near the bottom edge, where the cookie banner can cover it.
+5. Call `window.turnstile.reset()` after every attempt, since a token works only once.
+6. Enable the button again and restore its label.
 
-    const showAlert = (status, message) => {
-        contactAlert.textContent = message;
-        contactAlert.className = "form-alert form-alert-" + status;
-        contactAlert.setAttribute("role", status === "success" ? "status" : "alert");
-        contactAlert.hidden = false;
-        // Scroll only when the alert sits under the fixed header or near the
-        // bottom edge, where the cookie banner can cover it.
-        const box = contactAlert.getBoundingClientRect();
-
-        if (box.top < 90 || box.bottom > window.innerHeight - 140) {
-            contactAlert.scrollIntoView({ block: "center", behavior: "smooth" });
-        }
-        contactAlert.focus({ preventScroll: true });
-    };
-
-    const clearFieldErrors = () => {
-        contactForm.querySelectorAll(".f.has-error").forEach((field) => field.classList.remove("has-error"));
-        contactForm.querySelectorAll(".field-error").forEach((error) => error.remove());
-        contactForm.querySelectorAll("[aria-invalid]").forEach((input) => {
-            input.removeAttribute("aria-invalid");
-            input.removeAttribute("aria-describedby");
-        });
-    };
-
-    const showFieldErrors = (errors) => {
-        Object.keys(errors).forEach((name) => {
-            const input = contactForm.querySelector("[name=\"" + name + "\"]");
-            const field = input ? input.closest(".f") : null;
-
-            if (!field) {
-                return;
-            }
-
-            const error = document.createElement("small");
-            error.className = "field-error";
-            error.id = input.id + "-error";
-            error.textContent = errors[name];
-            field.classList.add("has-error");
-            field.appendChild(error);
-            input.setAttribute("aria-invalid", "true");
-            input.setAttribute("aria-describedby", error.id);
-        });
-    };
-
-    contactForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-
-        if (submitButton) {
-            submitButton.disabled = true;
-            submitButton.textContent = submitButton.dataset.sendingLabel || submitLabel;
-        }
-
-        let result = null;
-
-        try {
-            const response = await fetch(contactForm.action, {
-                method: "POST",
-                body: new FormData(contactForm),
-                headers: { "X-Requested-With": "fetch", Accept: "application/json" },
-            });
-            result = await response.json();
-        } catch (error) {
-            result = null;
-        }
-
-        clearFieldErrors();
-
-        if (result && result.status === "success") {
-            contactForm.reset();
-            showAlert("success", result.message);
-        } else if (result && result.message) {
-            showFieldErrors(result.errors || {});
-            showAlert("error", result.message);
-        } else {
-            showAlert("error", contactForm.dataset.errorMessage || "");
-        }
-
-        // A Turnstile token works only once, so get a fresh one for the next try.
-        if (window.turnstile) {
-            window.turnstile.reset();
-        }
-
-        if (submitButton) {
-            submitButton.disabled = false;
-            submitButton.textContent = submitLabel;
-        }
-    });
-}
-```
-
-CSS to add, adapted to the site's colours:
-
-```css
-.form-alert{margin:0 0 16px;padding:14px 16px;border-radius:12px;font-size:14.5px}
-.form-alert-success{background:rgba(47,181,156,.14);border:1px solid rgba(47,181,156,.4);color:#bdf0e2}
-.form-alert-error{background:rgba(240,138,138,.12);border:1px solid rgba(240,138,138,.4);color:#f8c4c4}
-.form-alert:focus{outline:none}
-.contact-form .f.has-error input,.contact-form .f.has-error textarea{border-color:#f08a8a}
-.field-error{color:#f6a3a3;font-size:12.5px}
-.btn:disabled{opacity:.65;cursor:wait}
-```
+Style the alert in both states, the field in error, the field error text and the disabled button, in the site's colours. Remove the focus outline from the alert, since it takes focus only from script.
 
 ## Testing locally
 

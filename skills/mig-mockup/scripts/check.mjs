@@ -52,6 +52,10 @@ for (const arg of args) {
     process.exit(2);
   }
 }
+if (pages.length === 0) {
+  console.error('No pages to check: the folder has no .html file besides index.html.');
+  process.exit(2);
+}
 outDir ??= 'shots';
 mkdirSync(outDir, { recursive: true });
 
@@ -141,7 +145,8 @@ for (const page of pages) {
         width, height: width < 600 ? 844 : 900, deviceScaleFactor: 1, mobile: width < 600,
       }, sessionId);
       const loaded = waitFor('Page.loadEventFired', sessionId);
-      await send('Page.navigate', { url: page.url }, sessionId);
+      const nav = await send('Page.navigate', { url: page.url }, sessionId);
+      if (nav.errorText) throw new Error(`could not load ${page.url}: ${nav.errorText}`);
       await loaded;
       await send('Runtime.evaluate', { expression: 'document.fonts.ready', awaitPromise: true }, sessionId);
       const { result } = await send('Runtime.evaluate', { expression: overflowProbe, returnByValue: true }, sessionId);

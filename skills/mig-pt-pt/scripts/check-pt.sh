@@ -9,7 +9,8 @@
 # Prints file:line, the match and the European form. Every hit needs a look:
 # a few words are correct in Portugal in another sense (arquivo as an archive,
 # baixar as lowering a price, tela as a painting canvas).
-# Exit code 0: nothing found. 1: hits to review. 2: nothing to check.
+# Exit code 0: nothing found. 1: hits to review. 2: nothing to check, or a
+# target that is missing or unreadable.
 set -euo pipefail
 export LC_ALL=C.UTF-8
 
@@ -21,7 +22,7 @@ rules=(
   'senhas?::palavra-passe'
   'baixar::transferir'
   'fa(zer|ça|çam|z|zemos) (o )?(download|upload|login|logout)::transferir, carregar, iniciar sessão, terminar sessão'
-  'salv(ar|e|ando|ou|o)::guardar'
+  'salv(ar|e|ando|ou)::guardar'
   'delet(ar|e|ado|ada|ados|adas)::eliminar, apagar'
   'cadastr\p{L}*::registo, registar'
   'registros?::registo'
@@ -60,6 +61,10 @@ if [ ${#targets[@]} -eq 0 ]; then
   exit 2
 fi
 
+for t in "${targets[@]}"; do
+  [ "$t" = "-" ] || [ -e "$t" ] || { echo "Not found: $t" >&2; exit 2; }
+done
+
 stdin_copy=""
 for i in "${!targets[@]}"; do
   if [ "${targets[$i]}" = "-" ]; then
@@ -76,11 +81,14 @@ for rule in "${rules[@]}"; do
   fix="${rule#*::}"
   # Whole words: no letter, digit or underscore on either side.
   regex="(?<![\p{L}\p{N}_])(?:${pattern})(?![\p{L}\p{N}_])"
+  # grep exits 1 for no match, and 2 when it could not read a target.
+  matches=$(grep -rnoiP --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules -- "$regex" "${targets[@]}") \
+    || [ $? -eq 1 ] || { echo "grep could not read every target, so the result is incomplete." >&2; exit 2; }
   while IFS= read -r line; do
     [ -z "$line" ] && continue
     hits=$((hits + 1))
     printf '%s  ->  %s\n' "$line" "$fix"
-  done < <(grep -rnoiP --exclude-dir=.git --exclude-dir=vendor --exclude-dir=node_modules -- "$regex" "${targets[@]}" 2>/dev/null || true)
+  done <<< "$matches"
 done
 
 if [ "$hits" -gt 0 ]; then

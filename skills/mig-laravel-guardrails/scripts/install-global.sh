@@ -21,7 +21,7 @@ done
 chmod +x "$guard"
 
 claude_settings="$HOME/.claude/settings.json"
-codex_dir="$HOME/.codex"
+codex_dir="${CODEX_HOME:-$HOME/.codex}"
 codex_hooks="$codex_dir/hooks.json"
 codex_rules="$codex_dir/rules/default.rules"
 codex_rule='prefix_rule(pattern=["php", "artisan", ["migrate:fresh", "migrate:refresh", "migrate:reset", "db:wipe"]], decision="forbidden", justification="Drops every table. Ask the user to run it themselves.")'
@@ -79,14 +79,22 @@ PY
 }
 
 run_json() {
-    local file=$1 host=$2 mode=check status rest
-    if ! $check && edit_json "$file" "$host" check | grep -q '^MISSING'; then
+    local file=$1 host=$2 out status rest
+    # A file python3 cannot parse must not pass as installed.
+    if ! out=$(edit_json "$file" "$host" check); then
+        report MISSING "$host settings: $file is not valid JSON. Fix it, then run this again."
+        return 0
+    fi
+    if ! $check && grep -q '^MISSING' <<< "$out"; then
         backup "$file"
-        mode=install
+        if ! out=$(edit_json "$file" "$host" install); then
+            report MISSING "$host settings: $file could not be written."
+            return 0
+        fi
     fi
     while read -r status rest; do
         report "$status" "$rest"
-    done < <(edit_json "$file" "$host" "$mode")
+    done <<< "$out"
 }
 
 run_json "$claude_settings" claude

@@ -24,7 +24,8 @@ Run these before opening a PR:
 - `npx skills add . --list` lists every skill.
 - `claude plugin validate .` passes. The missing icon warning is expected.
 - `grep -rnP '[\x{2014}\x{2013}\x{201C}\x{201D}]' skills README.md AGENTS.md` prints nothing.
-- Every script passes `bash -n`, and its own tests when it has them.
+- Every script passes `bash -n`.
+- `for t in tests/*.test.sh; do bash "$t"; done` passes. A change to a script that has a test file there adds a case for the new behaviour.
 
 ## Workflow
 

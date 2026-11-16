@@ -23,7 +23,7 @@ The guard is `scripts/laravel-db-guard.sh` in this skill's directory, run before
 
 - `migrate:fresh`, `migrate:refresh`, `migrate:reset` and `db:wipe`, in any form artisan accepts: quoted, abbreviated (`migrate:fr`), inside ssh commands, or through `Artisan::call` in tinker.
 - Test runs while `bootstrap/cache/config.php` exists, since a cached config ignores `phpunit.xml` and the environment, and test runs in the same command as `config:cache` or `optimize`, which create that file.
-- Test runs whose database is not SQLite in memory or a database whose name contains "test". The guard reads `phpunit.xml` as XML, so commented-out lines don't count, and accepts `DB_CONNECTION=sqlite DB_DATABASE=:memory:` written directly in front of the test command.
+- Test runs whose database is not SQLite in memory or a database whose name contains "test". The guard reads `phpunit.xml` as XML, so commented-out lines don't count, and accepts `DB_CONNECTION=sqlite DB_DATABASE=:memory:` written directly in front of the test command. A value set there wins over `phpunit.xml`, so an unsafe one is blocked, and so is any `DB_URL` or `DATABASE_URL`. A run with `-c`, `--configuration` or `--no-configuration` needs the safe values in front of it, since PHPUnit then skips the file the guard read.
 
 Steps:
 

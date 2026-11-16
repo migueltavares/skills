@@ -140,7 +140,7 @@ Generate it from the same data that renders the page, so prices and FAQ answers 
 - **FAQPage**: matches the visible FAQ word for word. Google retired FAQ rich results, so this is for AI tools and other search engines, not Google snippets.
 - Legal pages: a WebPage with `dateModified`, linked to the WebSite and Organization `@id`s.
 
-Encode with JSON_HEX_TAG or the equivalent, so `</script>` inside text can't break out. Validate the output against the schema skills' rules.
+Encode with JSON_HEX_TAG or the equivalent, so `</script>` inside text can't break out. Validate the output with Google's Rich Results Test (`https://search.google.com/test/rich-results`) and the Schema.org validator.
 
 ## Legal operator
 
@@ -180,7 +180,7 @@ One canonical host. `http://` redirects to `https://`, and `www.` redirects to t
 
 ## Agent readiness
 
-Lighthouse has an "Agentic browsing" check. Valid, semantic HTML is what passes it:
+Lighthouse has an "Agentic browsing" category. It checks the accessibility tree, `llms.txt`, WebMCP where the site uses it, and layout shift, and shows the result as a ratio such as 2/3. On a content site the accessibility tree is the part that fails, and valid, semantic HTML fixes it:
 
 - `<dl>` contains only `<dt>`/`<dd>` groups, each group optionally wrapped in one `<div>`. Any other child fails.
 - Every form field has a `<label>`, buttons are `<button>`, links are `<a href>`, and ARIA roles match the elements.

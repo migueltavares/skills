@@ -35,7 +35,7 @@ Fetch every public page in every language, plus `/robots.txt`, `/sitemap.xml` an
 
 ## AI search
 
-- `robots.txt` treats AI search bots (OAI-SearchBot, ChatGPT-User, Claude-SearchBot, Claude-User, PerplexityBot) and AI training crawlers (GPTBot, ClaudeBot, Google-Extended, Applebot-Extended) as the user decided at intake.
+- `robots.txt` treats the AI search bots and the AI training crawlers as the user decided at intake. The two lists of bot names are in the `robots.txt` section of `seo-aeo-checklist.md`.
 - `/llms.txt` exists and summarises the site in plain Markdown, following `seo-aeo-checklist.md`.
 - Key facts appear as plain text in short, self-contained passages: what it is, for whom, where, prices, contacts. AI tools quote passages, so each should make sense alone.
 - The operator's legal name and contacts appear on the site and match the structured data.

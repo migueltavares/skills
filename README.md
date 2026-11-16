@@ -8,7 +8,7 @@ Agent skills for Claude Code and Codex, built for repos where a merge to `main` 
 npx skills add migueltavares/skills
 ```
 
-Pick the skills when prompted. Install `mig-merge`, `mig-merged`, `mig-relay` and `mig-review-findings` together, since they call each other. Update later with `npx skills update`.
+Pick the skills when prompted. Install `mig-merge`, `mig-merged`, `mig-relay`, `mig-review-findings` and `mig-my-turn` together, since they call each other. Update later with `npx skills update`.
 
 Claude Code can also install them as a plugin, which turns on the database guard automatically:
 

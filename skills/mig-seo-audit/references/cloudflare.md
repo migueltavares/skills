@@ -4,7 +4,7 @@ For sites whose DNS runs through Cloudflare with the proxy on (orange cloud). Sp
 
 ## SSL and redirects
 
-- **SSL/TLS > Overview**: Full (strict). The origin needs a valid certificate: a public one, or a free Cloudflare Origin Certificate installed on the server.
+- **SSL/TLS > Overview**: Full (strict). A zone on Automatic SSL/TLS, the default for new zones, picks the mode itself, so switch it to Custom SSL/TLS to choose. The origin needs a valid certificate: a public one, or a free Cloudflare Origin Certificate installed on the server.
 - **SSL/TLS > Edge Certificates**: Always Use HTTPS on, Automatic HTTPS Rewrites on, minimum TLS 1.2. Turn HSTS on only once every subdomain serves HTTPS, since browsers remember it.
 - **One canonical host.** When the web server doesn't do the `www` redirect, add a Redirect Rule for requests where the hostname is `www.<domain>`: type Dynamic, expression `concat("https://<domain>", http.request.uri.path)`, status 301, with "Preserve query string" on.
 
@@ -16,7 +16,7 @@ For sites whose DNS runs through Cloudflare with the proxy on (orange cloud). Sp
 
 ## Bots and AI crawlers
 
-- **Security > Bots**: Bot Fight Mode can challenge legitimate crawlers. When it is on, check that Googlebot, Bingbot and the AI search bots the user allowed still get 200s. The Cloudflare logs and Search Console's URL Inspection show it.
+- **Security > Settings**, filtered by Bot traffic (Security > Bots in the older dashboard): Bot Fight Mode can challenge legitimate crawlers. When it is on, check that Googlebot, Bingbot, Google's tag checker and the AI search bots the user allowed still get 200s. The Cloudflare logs and Search Console's URL Inspection show it.
 - **AI Crawl Control** (or "Block AI bots", depending on the plan): match it to the user's intake answer, and to `robots.txt`. A dashboard rule that blocks a bot `robots.txt` allows wins, silently.
 - **Security > WAF**: rate-limit the contact form's POST route when the plan allows it. Turnstile covers the form itself, as `contact-form.md` describes.
 

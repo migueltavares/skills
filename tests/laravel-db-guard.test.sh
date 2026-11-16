@@ -89,6 +89,7 @@ check deny  safe   'DB_DATABASE=app php artisan test'
 check deny  safe   'DB_CONNECTION=mysql php artisan test'
 check deny  safe   'DB_CONNECTION=mysql DB_DATABASE=app vendor/bin/phpunit --filter phpunit'
 check deny  safe   'php artisan test && DB_DATABASE=app vendor/bin/pest'
+check deny  safe   'TOOL=bin/pest DB_DATABASE=app php artisan test'
 
 # The rightmost assignment counts, even when it is empty.
 check deny  bare   'DB_DATABASE=testing DB_DATABASE= DB_CONNECTION=mysql php artisan test'
@@ -99,6 +100,7 @@ check allow bare   'DB_DATABASE=app DB_DATABASE=testing php artisan test'
 check deny  safe   'DB_URL=mysql://localhost/app DB_DATABASE=testing php artisan test'
 check deny  bare   'DB_URL=mysql://localhost/app DB_CONNECTION=sqlite DB_DATABASE=:memory: php artisan test'
 check allow safe   'DB_URL= php artisan test'
+check deny  safe   'DATABASE_URL=mysql://localhost/app php artisan test'
 
 # A run that picks its own configuration cannot lean on phpunit.xml.
 check deny  safe   'vendor/bin/phpunit -c other.xml'
@@ -108,12 +110,37 @@ check deny  safe   'vendor/bin/phpunit --no-configuration'
 check deny  safe   'php artisan test -c other.xml'
 check allow safe   'DB_CONNECTION=sqlite DB_DATABASE=:memory: vendor/bin/phpunit -c other.xml'
 check allow safe   'vendor/bin/pest --compact --coverage'
+check deny  safe   'vendor/bin/phpunit -cconfig/other-file.xml'
 
 # A backslash before a line break: assignments are read, and phpunit.xml must be safe too.
 check allow safe   $'php artisan test \\\n  --filter=Login'
 check deny  safe   $'DB_CONNECTION=mysql \\\n  DB_DATABASE=app php artisan test'
 check deny  unsafe $'DB_CONNECTION=sqlite DB_DATABASE=:memory: \\\n  php artisan test'
 check allow safe   $'DB_CONNECTION=sqlite DB_DATABASE=:memory: \\\n  php artisan test'
+
+# Wrappers, PHP options and quoted values cannot hide an assignment.
+check deny  safe   'DB_DATABASE=app php -d x=y vendor/bin/phpunit'
+check deny  safe   'DB_DATABASE=app env php artisan test'
+check deny  safe   'env DB_DATABASE=app php artisan test'
+check deny  safe   'DB_URL=mysql://localhost/app php -d x=y vendor/bin/phpunit'
+check deny  safe   'DB_URL="mysql://localhost/app name" php artisan test'
+check deny  safe   'DB_DATABASE="app name" php artisan test'
+
+# Exported and bare assignments stay set for later commands.
+check deny  safe   'export DB_DATABASE=app && php artisan test'
+check deny  safe   'export DB_CONNECTION=mysql DB_DATABASE=app; php artisan test'
+check deny  safe   'DB_URL=mysql://localhost/app; php artisan test'
+check allow unsafe 'export DB_CONNECTION=sqlite DB_DATABASE=:memory: && php artisan test'
+check allow safe   'export APP_ENV=testing && php artisan test'
+
+# Subshells and command substitutions are checked by themselves.
+check deny  unsafe 'DB_DATABASE=testing vendor/bin/phpunit --filter "$(DB_DATABASE=app vendor/bin/phpunit )"'
+check deny  unsafe 'DB_DATABASE=testing vendor/bin/phpunit --filter "`DB_DATABASE=app vendor/bin/phpunit`"'
+check deny  unsafe '(php artisan test)'
+check deny  safe   '(DB_DATABASE=app php artisan test)'
+check deny  cached '(php artisan test)'
+check allow safe   '(php artisan test)'
+check allow safe   'out=$(php artisan test)'
 
 # File edits that mention a test command are not shell commands.
 check allow unsafe 'php artisan test' apply_patch

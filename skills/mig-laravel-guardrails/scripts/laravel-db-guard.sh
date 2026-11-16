@@ -62,7 +62,9 @@ fi
 
 # 2 and 3 only apply to test runs.
 test_cmd='(php[[:space:]]+)?([^;&|[:space:]]*/)?(artisan[[:space:]]+test|pest|phpunit)([[:space:]]|$)|composer[[:space:]]+(run[[:space:]]+)?test'
-printf '%s' "$norm" | grep -Eq "(^|[;&|[:space:]])($test_cmd)" || exit 0
+# Brackets, braces, backticks and $ count as spaces here, so a test run in a
+# subshell or a command substitution is found too.
+printf '%s' "$norm" | tr '(){}`$' '      ' | grep -Eq "(^|[;&|[:space:]])($test_cmd)" || exit 0
 
 # Find the Laravel root: a "cd <dir>" at the start of the command, the cwd, or the git top level.
 root=""
@@ -129,13 +131,20 @@ fi
 
 # 3b. Each test command, with the environment assignments directly in front
 #     of it. Split the command on ; & | and line breaks. In every part that
-#     runs tests, find the first test command and walk back over the VAR=value
-#     words before it. Walking back, the first value seen is the rightmost
+#     runs tests, find the first test command and walk back over the words
+#     before it. Walking back, the first value seen is the rightmost
 #     one, which is the one the shell uses, even when it is empty.
 #     - An assignment wins over phpunit.xml, because PHPUnit keeps a variable
 #       that is already set. So the pair checked is the assigned value where
 #       there is one, and the phpunit.xml value otherwise.
-#     - A DB_URL assignment is refused: Laravel reads the database from it.
+#     - Every assignment before the test command in its part counts, not only
+#       an unbroken run of them, so "env", "php -d x=y" or a quoted value with
+#       a space cannot hide one. So do the assignments of an earlier part that
+#       is only "export VAR=value" or "VAR=value", which stay set in the shell.
+#     - Brackets, braces, backticks and $ also split the command, so a test
+#       run inside a subshell or a command substitution is checked by itself.
+#     - A DB_URL or DATABASE_URL assignment is refused: Laravel reads the
+#       database from it.
 #     - -c, --configuration and --no-configuration make PHPUnit skip the file
 #       read above, so only the assignments count.
 #     - A backslash before a line break may or may not continue the line. Such
@@ -143,31 +152,55 @@ fi
 trusted=true joined=$cmd
 case "$cmd" in *$'\\\n'*) trusted=false; joined=${cmd//$'\\\n'/ } ;; esac
 start_re="^($test_cmd)"
-config_re='(^|[[:space:]])(-c[^[:space:]-]*|--conf[a-z-]*|--no-conf[a-z-]*)([[:space:]=]|$)'
+assign_re='^[A-Za-z_][A-Za-z0-9_]*='
+config_re='(^|[[:space:]])(-c[^[:space:]]*|--conf[a-z-]*|--no-conf[a-z-]*)([[:space:]=]|$)'
 checked=0
+kept_conn="" kept_db="" kept_url=""
+kept_conn_set=false kept_db_set=false
 while IFS= read -r seg; do
     read -ra words <<< "$seg"
     start=-1
     for (( i = 0; i < ${#words[@]}; i++ )); do
+        # An assignment is never the command, even when its value looks like one.
+        [[ ${words[i]} =~ $assign_re ]] && continue
         rest="${words[*]:i}"
         [[ $rest =~ $start_re ]] && { start=$i; break; }
     done
-    [ "$start" -ge 0 ] || continue
+    if [ "$start" -lt 0 ]; then
+        # "export VAR=value" and a bare "VAR=value" stay set for later parts.
+        first=0
+        [ "${words[0]:-}" = export ] && first=1
+        only_assignments=true
+        for (( i = first; i < ${#words[@]}; i++ )); do
+            [[ ${words[i]} =~ $assign_re ]] || { only_assignments=false; break; }
+        done
+        $only_assignments && for (( i = first; i < ${#words[@]}; i++ )); do
+            w=${words[i]}
+            case $w in
+                DB_CONNECTION=*) kept_conn=${w#*=} kept_conn_set=true ;;
+                DB_DATABASE=*) kept_db=${w#*=} kept_db_set=true ;;
+                DB_URL=*|DATABASE_URL=*) kept_url=${w#*=} ;;
+            esac
+        done
+        continue
+    fi
     checked=$(( checked + 1 ))
     file_conn=$xml_conn file_db=$xml_db own_config=false
     [[ $seg =~ $config_re ]] && { file_conn="" file_db="" own_config=true; }
-    conn=$file_conn db=$file_db url=""
-    conn_set=false db_set=false url_set=false
+    conn=$file_conn db=$file_db url=$kept_url
+    conn_set=$kept_conn_set db_set=$kept_db_set
+    $conn_set && conn=$kept_conn
+    $db_set && db=$kept_db
+    conn_here=false db_here=false url_here=false
     for (( i = start - 1; i >= 0; i-- )); do
         w=${words[i]}
-        [[ $w =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || break
         case $w in
-            DB_CONNECTION=*) $conn_set || { conn=${w#*=}; conn_set=true; } ;;
-            DB_DATABASE=*) $db_set || { db=${w#*=}; db_set=true; } ;;
-            DB_URL=*) $url_set || { url=${w#*=}; url_set=true; } ;;
+            DB_CONNECTION=*) $conn_here || { conn=${w#*=}; conn_here=true; conn_set=true; } ;;
+            DB_DATABASE=*) $db_here || { db=${w#*=}; db_here=true; db_set=true; } ;;
+            DB_URL=*|DATABASE_URL=*) $url_here || { url=${w#*=}; url_here=true; } ;;
         esac
     done
-    [ -z "$url" ] || deny "the command sets DB_URL, and Laravel reads the database from it, whatever DB_DATABASE says. Remove DB_URL from the command."
+    [ -z "$url" ] || deny "the command sets DB_URL or DATABASE_URL, and Laravel reads the database from it, whatever DB_DATABASE says. Remove it from the command."
     safe_pair "$conn" "$db" && { $trusted || safe_pair "$file_conn" "$file_db"; } && continue
     if $own_config; then
         deny "the command picks its own PHPUnit configuration (-c, --configuration or --no-configuration), so ${xml:-phpunit.xml} does not decide which database the tests use. Prefix the command with DB_CONNECTION=sqlite DB_DATABASE=:memory:, or drop the option."
@@ -176,7 +209,7 @@ while IFS= read -r seg; do
     fi
     checked=0
     break
-done < <(printf '%s\n' "$joined" | tr -d "\"'\\\\" | tr '\r\t' '  ' | sed -E 's/[;&|]+/\n/g')
+done < <(printf '%s\n' "$joined" | tr -d "\"'\\\\" | tr '\r\t' '  ' | sed -E 's/[;&|(){}`$]+/\n/g')
 [ "$checked" -gt 0 ] && exit 0
 
 deny "${xml:-phpunit.xml} does not point tests at SQLite in memory or a test database, so they could reach the real one. Inside <php>, add <env name='DB_CONNECTION' value='sqlite'/> and <env name='DB_DATABASE' value=':memory:'/>, or prefix the command with DB_CONNECTION=sqlite DB_DATABASE=:memory:."

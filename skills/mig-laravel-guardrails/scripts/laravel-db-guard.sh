@@ -62,9 +62,10 @@ fi
 
 # 2 and 3 only apply to test runs.
 test_cmd='(php[[:space:]]+)?([^;&|[:space:]]*/)?(artisan[[:space:]]+test|pest|phpunit)([[:space:]]|$)|composer[[:space:]]+(run[[:space:]]+)?test'
-# Brackets, braces, backticks and $ count as spaces here, so a test run in a
-# subshell or a command substitution is found too.
-printf '%s' "$norm" | tr '(){}`$' '      ' | grep -Eq "(^|[;&|[:space:]])($test_cmd)" || exit 0
+# Brackets, braces, backticks, $ and the separators ; & | count as spaces
+# here, so a test run in a subshell or a command substitution is found, and
+# so is one with a separator right after it.
+printf '%s' "$norm" | tr '(){}`$;&|' '         ' | grep -Eq "(^|[;&|[:space:]])($test_cmd)" || exit 0
 
 # Find the Laravel root: a "cd <dir>" at the start of the command, the cwd, or the git top level.
 root=""
@@ -139,14 +140,20 @@ fi
 #       there is one, and the phpunit.xml value otherwise.
 #     - Every assignment before the test command in its part counts, not only
 #       an unbroken run of them, so "env", "php -d x=y" or a quoted value with
-#       a space cannot hide one. So do the assignments of an earlier part that
-#       is only "export VAR=value" or "VAR=value", which stay set in the shell.
+#       a space cannot hide one.
+#     - An earlier "export VAR=value" or bare "VAR=value" part can make a run
+#       unsafe, and never makes it safe: the guard cannot tell whether that
+#       part ran, in which shell, or whether an unset followed it.
+#     - "env" with options (-u, -i) can drop the assignments in front of it,
+#       so phpunit.xml must be safe as well.
 #     - Brackets, braces, backticks and $ also split the command, so a test
 #       run inside a subshell or a command substitution is checked by itself.
+#       A database variable set from a substitution or another variable is
+#       refused, since its value cannot be read here.
 #     - A DB_URL or DATABASE_URL assignment is refused: Laravel reads the
 #       database from it.
-#     - -c, --configuration and --no-configuration make PHPUnit skip the file
-#       read above, so only the assignments count.
+#     - -c, --configuration and --no-configuration after the test command make
+#       PHPUnit skip the file read above, so only the assignments count.
 #     - A backslash before a line break may or may not continue the line. Such
 #       commands are read as continued, and phpunit.xml must be safe as well.
 trusted=true joined=$cmd
@@ -154,8 +161,12 @@ case "$cmd" in *$'\\\n'*) trusted=false; joined=${cmd//$'\\\n'/ } ;; esac
 start_re="^($test_cmd)"
 assign_re='^[A-Za-z_][A-Za-z0-9_]*='
 config_re='(^|[[:space:]])(-c[^[:space:]]*|--conf[a-z-]*|--no-conf[a-z-]*)([[:space:]=]|$)'
+computed_re='(^|[^A-Za-z0-9_])(DB_CONNECTION|DB_DATABASE|DB_URL|DATABASE_URL)=[$`]'
+if [[ $norm =~ $computed_re ]]; then
+    deny "the command sets a database variable from a substitution or another variable, so the guard cannot read its value. Write the value out, or use DB_CONNECTION=sqlite DB_DATABASE=:memory:."
+fi
 checked=0
-kept_conn="" kept_db="" kept_url=""
+kept_conn="" kept_db="" kept_url="" kept_durl=""
 kept_conn_set=false kept_db_set=false
 while IFS= read -r seg; do
     read -ra words <<< "$seg"
@@ -167,45 +178,55 @@ while IFS= read -r seg; do
         [[ $rest =~ $start_re ]] && { start=$i; break; }
     done
     if [ "$start" -lt 0 ]; then
-        # "export VAR=value" and a bare "VAR=value" stay set for later parts.
-        first=0
-        [ "${words[0]:-}" = export ] && first=1
-        only_assignments=true
-        for (( i = first; i < ${#words[@]}; i++ )); do
-            [[ ${words[i]} =~ $assign_re ]] || { only_assignments=false; break; }
-        done
-        $only_assignments && for (( i = first; i < ${#words[@]}; i++ )); do
+        # An export, or a part made only of assignments, may stay set for
+        # later parts. A quoted value with a space splits into extra words, so
+        # an export keeps every assignment it holds.
+        keeps=true
+        if [ "${words[0]:-}" != export ]; then
+            for (( i = 0; i < ${#words[@]}; i++ )); do
+                [[ ${words[i]} =~ $assign_re ]] || { keeps=false; break; }
+            done
+        fi
+        $keeps && for (( i = 0; i < ${#words[@]}; i++ )); do
             w=${words[i]}
             case $w in
                 DB_CONNECTION=*) kept_conn=${w#*=} kept_conn_set=true ;;
                 DB_DATABASE=*) kept_db=${w#*=} kept_db_set=true ;;
-                DB_URL=*|DATABASE_URL=*) kept_url=${w#*=} ;;
+                DB_URL=*) kept_url=${w#*=} ;;
+                DATABASE_URL=*) kept_durl=${w#*=} ;;
             esac
         done
         continue
     fi
     checked=$(( checked + 1 ))
     file_conn=$xml_conn file_db=$xml_db own_config=false
-    [[ $seg =~ $config_re ]] && { file_conn="" file_db="" own_config=true; }
-    conn=$file_conn db=$file_db url=$kept_url
-    conn_set=$kept_conn_set db_set=$kept_db_set
-    $conn_set && conn=$kept_conn
-    $db_set && db=$kept_db
-    conn_here=false db_here=false url_here=false
+    rest="${words[*]:start}"
+    [[ $rest =~ $config_re ]] && { file_conn="" file_db="" own_config=true; }
+    conn=$file_conn db=$file_db url=$kept_url durl=$kept_durl
+    conn_here=false db_here=false url_here=false durl_here=false
+    part_trusted=$trusted option_seen=false
     for (( i = start - 1; i >= 0; i-- )); do
         w=${words[i]}
         case $w in
-            DB_CONNECTION=*) $conn_here || { conn=${w#*=}; conn_here=true; conn_set=true; } ;;
-            DB_DATABASE=*) $db_here || { db=${w#*=}; db_here=true; db_set=true; } ;;
-            DB_URL=*|DATABASE_URL=*) $url_here || { url=${w#*=}; url_here=true; } ;;
+            DB_CONNECTION=*) $conn_here || { conn=${w#*=}; conn_here=true; } ;;
+            DB_DATABASE=*) $db_here || { db=${w#*=}; db_here=true; } ;;
+            DB_URL=*) $url_here || { url=${w#*=}; url_here=true; } ;;
+            DATABASE_URL=*) $durl_here || { durl=${w#*=}; durl_here=true; } ;;
+            -*) option_seen=true ;;
+            env) $option_seen && part_trusted=false ;;
         esac
     done
-    [ -z "$url" ] || deny "the command sets DB_URL or DATABASE_URL, and Laravel reads the database from it, whatever DB_DATABASE says. Remove it from the command."
-    safe_pair "$conn" "$db" && { $trusted || safe_pair "$file_conn" "$file_db"; } && continue
+    [ -z "$url$durl" ] || deny "the command sets DB_URL or DATABASE_URL, and Laravel reads the database from it, whatever DB_DATABASE says. Remove it from the command."
+    # The same pair with the values an earlier part may have left set.
+    kept_pair_conn=$conn kept_pair_db=$db
+    $conn_here || { $kept_conn_set && kept_pair_conn=$kept_conn; }
+    $db_here || { $kept_db_set && kept_pair_db=$kept_db; }
+    safe_pair "$conn" "$db" && safe_pair "$kept_pair_conn" "$kept_pair_db" \
+        && { $part_trusted || safe_pair "$file_conn" "$file_db"; } && continue
     if $own_config; then
         deny "the command picks its own PHPUnit configuration (-c, --configuration or --no-configuration), so ${xml:-phpunit.xml} does not decide which database the tests use. Prefix the command with DB_CONNECTION=sqlite DB_DATABASE=:memory:, or drop the option."
-    elif $conn_set || $db_set; then
-        deny "the command sets DB_CONNECTION or DB_DATABASE to something other than SQLite in memory or a test database, and those values win over ${xml:-phpunit.xml}. Remove them, or use DB_CONNECTION=sqlite DB_DATABASE=:memory:."
+    elif $conn_here || $db_here || $kept_conn_set || $kept_db_set; then
+        safe_pair "$file_conn" "$file_db" && deny "the command sets DB_CONNECTION or DB_DATABASE to something other than SQLite in memory or a test database, and those values win over ${xml:-phpunit.xml}. Remove them, or put DB_CONNECTION=sqlite DB_DATABASE=:memory: directly in front of the test command."
     fi
     checked=0
     break

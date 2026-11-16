@@ -110,6 +110,8 @@ check deny  safe   'vendor/bin/phpunit --no-configuration'
 check deny  safe   'php artisan test -c other.xml'
 check allow safe   'DB_CONNECTION=sqlite DB_DATABASE=:memory: vendor/bin/phpunit -c other.xml'
 check allow safe   'vendor/bin/pest --compact --coverage'
+check allow safe   'php -c php.ini artisan test'
+check deny  safe   'php -c php.ini vendor/bin/phpunit -c other.xml'
 check deny  safe   'vendor/bin/phpunit -cconfig/other-file.xml'
 
 # A backslash before a line break: assignments are read, and phpunit.xml must be safe too.
@@ -130,7 +132,39 @@ check deny  safe   'DB_DATABASE="app name" php artisan test'
 check deny  safe   'export DB_DATABASE=app && php artisan test'
 check deny  safe   'export DB_CONNECTION=mysql DB_DATABASE=app; php artisan test'
 check deny  safe   'DB_URL=mysql://localhost/app; php artisan test'
-check allow unsafe 'export DB_CONNECTION=sqlite DB_DATABASE=:memory: && php artisan test'
+check allow safe   'export DB_CONNECTION=sqlite DB_DATABASE=:memory: && php artisan test'
+check deny  safe   'export DB_CONNECTION=sqlite DB_DATABASE=:memory:; export DB_DATABASE="app name"; php artisan test'
+
+# An earlier part never makes a run safe: it may not have run, or not in this shell.
+check deny  unsafe 'export DB_CONNECTION=sqlite DB_DATABASE=:memory: && php artisan test'
+check deny  unsafe '(export DB_CONNECTION=sqlite DB_DATABASE=:memory:); php artisan test'
+check deny  bare   'export DB_CONNECTION=sqlite DB_DATABASE=:memory:; unset DB_DATABASE; php artisan test'
+check deny  unsafe 'true || export DB_CONNECTION=sqlite DB_DATABASE=:memory:; php artisan test'
+check deny  bare   'DB_CONNECTION=sqlite DB_DATABASE=:memory:; php artisan test'
+check allow unsafe 'export APP_ENV=testing; DB_CONNECTION=sqlite DB_DATABASE=:memory: php artisan test'
+
+# env with options can drop the assignments in front of it.
+check deny  unsafe 'DB_DATABASE=testing DB_CONNECTION=sqlite env -u DB_DATABASE -u DB_CONNECTION php artisan test'
+check deny  bare   'DB_DATABASE=testing env -i php artisan test'
+check allow safe   'env -u XDEBUG_MODE php artisan test'
+check allow unsafe 'env DB_CONNECTION=sqlite DB_DATABASE=:memory: php artisan test'
+
+# A separator right after the test command.
+check deny  cached 'php artisan test;'
+check deny  unsafe 'php artisan test&& echo done'
+check deny  unsafe 'vendor/bin/phpunit|tee out.log'
+check allow safe   'php artisan test; echo done'
+
+# DB_URL and DATABASE_URL are separate variables.
+check deny  safe   'DB_URL=mysql://h/app DATABASE_URL= php artisan test'
+check deny  safe   'DATABASE_URL=mysql://h/app DB_URL= php artisan test'
+check allow safe   'DB_URL= DATABASE_URL= php artisan test'
+
+# A database variable set from a substitution or another variable cannot be read.
+check deny  safe   'DB_URL="$(printf mysql://h/app)" php artisan test'
+check deny  safe   'DB_URL=`printf mysql://h/app` php artisan test'
+check deny  safe   'DB_DATABASE=$REAL_DB php artisan test'
+check allow safe   'APP_KEY=$(php -r "echo 1;") php artisan test'
 check allow safe   'export APP_ENV=testing && php artisan test'
 
 # Subshells and command substitutions are checked by themselves.

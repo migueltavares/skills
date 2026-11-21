@@ -98,8 +98,8 @@ Read the project's workflow in AGENTS.md first. Most projects use a branch and a
 
 ## 7. Independent review
 
-1. List which provider wrote each part of the diff: each implementer's files, and the files the main thread wrote itself. The main thread counts as its own provider (Claude in Claude Code, OpenAI in Codex).
-2. Send each part to a reviewer from the other provider, using the Review row in [references/models.md](references/models.md). When one provider wrote everything, one reviewer covers it all.
+1. List which provider wrote each part of the diff: each implementer's files, and the files the main thread wrote itself. The main thread counts as its own provider (Claude in Claude Code, OpenAI in Codex). Gemini, through the Antigravity provider, is a third.
+2. Send each part to a reviewer from a provider that didn't write it, using the Review row in [references/models.md](references/models.md). When one provider wrote everything, one reviewer covers it all.
 3. In T3 Code, call `delegate_task` with `role: "review"` and a task built from [references/review.md](references/review.md). Elsewhere, use the other provider's CLI in read-only mode when it is installed, else a fresh-context subagent, and say in the Report that the review was same-provider.
 4. When a project rule skips or narrows the review for this step, follow it and say so in the Report.
 5. Verify every finding the way `mig-review-findings` step 2 does, with the same classes: Confirmed, Refuted, Partial, Needs investigation, Out of scope.

@@ -4,6 +4,9 @@
 #   $CODEX_HOME/AGENTS.md gets a marked block with the text itself, since
 #                         AGENTS.md cannot import files (CODEX_HOME
 #                         defaults to ~/.codex)
+#   $GEMINI_HOME/GEMINI.md gets a marked block with the text itself, since
+#                         Antigravity does not expand bare @path imports
+#                         (GEMINI_HOME defaults to ~/.gemini)
 # A personal file, ~/.agents/mig/rules.local.md, is added after the rules when
 # it exists, so local changes survive skill updates.
 #
@@ -28,9 +31,9 @@ if [ -z "$unslop" ] && [ "$mode" != --remove ]; then
     exit 1
 fi
 
-python3 - "$mode" "$here/rules.md" "$HOME/.agents/mig/rules.local.md" "$unslop" "$HOME" "${CODEX_HOME:-$HOME/.codex}" <<'PY'
+python3 - "$mode" "$here/rules.md" "$HOME/.agents/mig/rules.local.md" "$unslop" "$HOME" "${CODEX_HOME:-$HOME/.codex}" "${GEMINI_HOME:-$HOME/.gemini}" <<'PY'
 import os, re, shutil, sys, time
-mode, rules, local, unslop, home, codex_home = sys.argv[1:7]
+mode, rules, local, unslop, home, codex_home, gemini_home = sys.argv[1:8]
 START, END = "<!-- mig-mode:start -->", "<!-- mig-mode:end -->"
 stamp = time.strftime("%Y%m%d-%H%M%S")
 missing = False
@@ -50,7 +53,13 @@ def body(path):
 
 def block_for(target, text):
     other = text.split(START)[0] + (text.split(END, 1)[1] if END in text else "")
-    has_unslop = "unslop/SKILL.md" in other or "unslop:start" in other
+    if target == "gemini":
+        # Antigravity expands @[label](path), not Claude Code's bare @path.
+        has_unslop = "unslop:start" in other or "# Unslop" in other or bool(
+            re.search(r"@\[[^\]]+\]\([^)]*unslop/SKILL\.md\)", other)
+        )
+    else:
+        has_unslop = "unslop/SKILL.md" in other or "unslop:start" in other
     lines = []
     if target == "claude":
         lines.append("@" + rules)
@@ -66,7 +75,11 @@ def block_for(target, text):
             lines.append(body(unslop))
     return START + "\n" + "\n\n".join(lines) + "\n" + END
 
-for target, path in (("claude", f"{home}/.claude/CLAUDE.md"), ("codex", f"{codex_home}/AGENTS.md")):
+for target, path in (
+    ("claude", f"{home}/.claude/CLAUDE.md"),
+    ("codex", f"{codex_home}/AGENTS.md"),
+    ("gemini", f"{gemini_home}/GEMINI.md"),
+):
     if not os.path.isdir(os.path.dirname(path)):
         print(f"SKIPPED  {target}: {os.path.dirname(path)} does not exist")
         continue
@@ -105,7 +118,7 @@ for target, path in (("claude", f"{home}/.claude/CLAUDE.md"), ("codex", f"{codex
     print(f"{'UPDATED ' if current else 'ADDED   '} {path}")
 
 if not found:
-    print("MISSING  neither ~/.claude nor the Codex home exists, so there is nothing to set up")
+    print("MISSING  none of ~/.claude, the Codex home, or the Gemini home exist, so there is nothing to set up")
     missing = True
 sys.exit(1 if missing else 0)
 PY

@@ -34,6 +34,7 @@ Check each item against the code. An item that doesn't apply gets one line sayin
 - Columns used in `where`, `orderBy` and joins on large tables have indexes. Check with `EXPLAIN` against a copy of real data.
 - Exports and reports run in chunks or in a queue, never as one query over the whole table.
 - Migrations that drop columns or tables, or rewrite data, are reversible or have a backup step in their deploy notes.
+- Migrations on MariaDB where `explicit_defaults_for_timestamp` may be OFF: avoid an un-defaulted NOT NULL `timestamp()` column, which can silently gain `ON UPDATE CURRENT_TIMESTAMP` and overwrite itself on later updates. Use `nullable()`, `useCurrent()`, or `dateTime()`.
 
 ## Jobs and operations
 

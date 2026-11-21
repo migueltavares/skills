@@ -136,7 +136,7 @@ A failed deploy stops the whole run, and leaves the remaining PRs unmerged. Show
 - When it failed before production changed (a build, test or packaging step), propose a fix-forward PR.
 - When production changed, offer the rollback from the deploy notes.
 
-**e. Clean up.** Invoke `mig-merged` with `<n> from mig-merge`, so it skips its own hand-off.
+**e. Clean up.** Invoke `mig-merged` with `<n> from mig-merge`, so it skips its own hand-off. Never replace `mig-merged` with a hand-rolled cleanup script, even one that copies its steps.
 
 A PR is done when it is merged, its deploy is confirmed healthy, and its cleanup ran.
 
@@ -148,4 +148,6 @@ Print the report before anything else: one row per PR with number, title, merge 
 Loose ends: <PRs left unmerged> | <postponed deploys> | <retargeted PRs waiting for CI> | <dirty worktrees> | none
 ```
 
-Then, after the report is printed, invoke `mig-relay` once, when work remains in an order.
+Next, run `mig-merged` with no PR numbers (and `from mig-merge`) to scan for older merged branches and worktrees left behind before this run, both local and remote. Show any candidates for confirmation, and leave alone branches with no merged PR or with an open PR.
+
+Then, after the report and sweep are done, invoke `mig-relay` once, when work remains in an order.

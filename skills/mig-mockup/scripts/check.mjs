@@ -120,6 +120,27 @@ const waitFor = (method, sessionId, ms = 20000) => new Promise((ok, fail) => {
   listeners.push(l);
 });
 
+const lazyScroll = `(async () => {
+  const step = Math.max(200, Math.floor(window.innerHeight * 0.8));
+  let y = 0;
+  for (let i = 0; i < 40; i++) {
+    const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+    if (y >= max) break;
+    y = Math.min(max, y + step);
+    window.scrollTo(0, y);
+    await new Promise((r) => setTimeout(r, 50));
+  }
+  const imgs = [...document.querySelectorAll('img')].filter((img) => !img.complete);
+  if (imgs.length) {
+    await Promise.race([
+      Promise.all(imgs.map((img) => new Promise((r) => { img.addEventListener('load', r, { once: true }); img.addEventListener('error', r, { once: true }); }))),
+      new Promise((r) => setTimeout(r, 2000)),
+    ]);
+  }
+  window.scrollTo(0, 0);
+  await new Promise((r) => setTimeout(r, 50));
+})()`;
+
 const overflowProbe = `(() => {
   const vw = document.documentElement.clientWidth;
   const offenders = [];
@@ -149,6 +170,7 @@ for (const page of pages) {
       if (nav.errorText) throw new Error(`could not load ${page.url}: ${nav.errorText}`);
       await loaded;
       await send('Runtime.evaluate', { expression: 'document.fonts.ready', awaitPromise: true }, sessionId);
+      await send('Runtime.evaluate', { expression: lazyScroll, awaitPromise: true }, sessionId);
       const { result } = await send('Runtime.evaluate', { expression: overflowProbe, returnByValue: true }, sessionId);
       const probe = result.value;
       const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true }, sessionId);

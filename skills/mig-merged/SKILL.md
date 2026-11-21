@@ -17,15 +17,17 @@ metadata:
 
 A merged PR leaves branches, worktrees and sometimes a stacked PR pointing at a branch that is about to disappear. This skill clears all of it, so the checkout sits on an up-to-date default branch and the next step can start.
 
-Input: PR numbers in any form (`/mig-merged 12 14`, "PR 12 and 14", "#12, #14"), optionally followed by `from mig-merge` when `mig-merge` calls it. With no numbers, find candidates: merged PRs whose head branch still exists locally or as a worktree.
+Input: PR numbers in any form (`/mig-merged 12 14`, "PR 12 and 14", "#12, #14"), optionally followed by `from mig-merge` when `mig-merge` calls it. With no numbers, find candidates: merged PRs whose head branch still exists locally, on `origin`, or as a worktree.
 
 ```bash
-gh pr list --state merged --limit 30 --json number,headRefName,headRefOid,mergedAt
+gh pr list --state merged --limit 100 --json number,headRefName,headRefOid,mergedAt
+gh pr list --state open --json number,headRefName
 git branch --format='%(refname:short)'
+git ls-remote --heads origin
 git worktree list --porcelain
 ```
 
-Show the candidates and clean up the ones the user confirms.
+Skip the default branch, any branch with an open PR, any branch with no merged PR, and any branch whose current tip has commits not in the merged PR's `headRefOid` (such as a reused branch name or late commits, which go through step 4 instead). Show the remaining candidates and clean up the ones the user confirms.
 
 ## Safety rules
 
@@ -43,7 +45,7 @@ Run from the main checkout of the PR's own repo, the first entry in its `git wor
 gh pr view <n> --json state,mergedAt,mergeCommit,headRefName,headRefOid,baseRefName
 ```
 
-A PR that is not `MERGED` is skipped and reported. When the user wants the agent to merge it, invoke `mig-merge` for it. Never merge with a bare `gh pr merge`, which skips the gate and the deploy wait.
+A PR that is not `MERGED` is skipped and reported. When the user wants the agent to merge it, ask them to run `/mig-merge <n>`, or read `mig-merge/SKILL.md` and follow its full gate and deploy wait when they already gave merge approval in this thread (`mig-merge` disables model invocation, so a Skill tool call refuses it). Never merge with a bare `gh pr merge` or `pull_request_merge`, which skips the gate and the deploy wait.
 
 **2. Update the default branch.** `git fetch --prune origin`, switch to the default branch, `git pull --ff-only`. Uncommitted changes in the main checkout come along when the switch and pull succeed: list them in the report. Stop and ask only when git refuses because they conflict.
 

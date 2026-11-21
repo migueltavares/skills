@@ -1,6 +1,6 @@
 ---
 name: mig-mode
-description: Always-on working rules for Claude Code and Codex, including unslop. Run /mig-mode setup once per machine, and again after updates.
+description: Always-on working rules for Claude Code, Codex and Antigravity, including unslop. Run /mig-mode setup once per machine, and again after updates.
 disable-model-invocation: true
 metadata:
   credits:
@@ -17,15 +17,15 @@ metadata:
 
 # mig-mode
 
-A skill loads only when someone calls it or its description matches the task. Rules that must hold in every session belong in the files every session loads: `~/.claude/CLAUDE.md` for Claude Code and `~/.codex/AGENTS.md` for Codex. This skill keeps the rules in [rules.md](rules.md) and writes them into both files.
+A skill loads only when someone calls it or its description matches the task. Rules that must hold in every session belong in the files every session loads: `~/.claude/CLAUDE.md` for Claude Code, `~/.codex/AGENTS.md` for Codex, and `~/.gemini/GEMINI.md` for Antigravity. This skill keeps the rules in [rules.md](rules.md) and writes them into each installed host's file.
 
-Claude Code gets `@` imports, so it always reads the current rules. Codex gets a copy of the text, because AGENTS.md can't import files. Both live between `<!-- mig-mode:start -->` and `<!-- mig-mode:end -->`, so setup can update or remove them without touching anything else.
+Claude Code gets `@` imports, so it always reads the current rules. Codex and Antigravity get a copy of the text, because Codex's AGENTS.md can't import files and Antigravity doesn't expand Claude Code's bare `@path` imports. All blocks live between `<!-- mig-mode:start -->` and `<!-- mig-mode:end -->`, so setup can update or remove them without touching anything else.
 
 ## Setup
 
 1. Run `bash <skill-dir>/scripts/setup.sh --check`, with `<skill-dir>` resolved to this skill's absolute installed path.
 2. When it reports unslop as missing, ask the user, then run `npx skills add cursor/plugins --skill unslop -g`.
-3. Show the user what setup adds: the import lines for CLAUDE.md, and the text from rules.md for AGENTS.md. Unslop is left out of a file that already loads it.
+3. Show the user what setup adds: the import lines for CLAUDE.md, and the text from rules.md for AGENTS.md and GEMINI.md. Unslop is left out of a file that already loads it in a format that host expands.
 4. Run `bash <skill-dir>/scripts/setup.sh`. It backs up each file before changing it.
 5. Tell the user that new sessions pick the rules up, and the current one does not.
 
@@ -34,5 +34,5 @@ Done when `--check` exits 0: `OK` for each host that is installed, and `SKIPPED`
 ## Changing the rules
 
 - Personal additions go in `~/.agents/mig/rules.local.md`. Setup adds that file after the rules, and skill updates leave it alone.
-- After `npx skills update`, run setup again so the Codex copy matches.
-- `bash <skill-dir>/scripts/setup.sh --remove` takes both blocks out.
+- After `npx skills update`, run setup again so the Codex and Antigravity copies match.
+- `bash <skill-dir>/scripts/setup.sh --remove` takes all managed blocks out.

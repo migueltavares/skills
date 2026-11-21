@@ -57,7 +57,7 @@ norm=$(printf '%s' "$cmd" | tr '\n\r\t' '   ' | tr -d "\"'\\\\")
 #    match the prefixes too: mi*:f* is migrate:fresh, mi*:ref* migrate:refresh,
 #    mi*:res* migrate:reset, db:w* db:wipe.
 if printf '%s' "$norm" | grep -Eiq 'artisan[^;&|]*[[:space:](,]+(mi[a-z]*:(f|ref|res)[a-z]*|db:w[a-z]*)([^a-z:]|$)'; then
-    deny "this command drops every table. Agents never run it. Ask the user to run it themselves if it is really needed."
+    deny "this command drops every table. Agents never run it. Ask the user to run it themselves if it is really needed. If those words appear only in prose such as a PR body, commit message or heredoc, write the text with a file tool and pass --body-file instead."
 fi
 
 # 2 and 3 only apply to test runs.
@@ -90,7 +90,7 @@ fi
 # optimize:clear does not.
 # Same separators as rule 1, so Artisan::call(config:cache) in tinker counts.
 if printf '%s' "$norm" | grep -Eiq 'artisan[^;&|]*[[:space:](,]+(co[a-z]*:ca[a-z]*|optimize)([^a-z:]|$)'; then
-    deny "this command caches the config and runs tests, so the tests would ignore phpunit.xml and run against the real database. Run the tests in a separate command, after php artisan config:clear."
+    deny "this command caches the config and runs tests, so the tests would ignore phpunit.xml and run against the real database. Run the tests in a separate command, after php artisan config:clear. If those words appear only in prose such as a PR body, commit message or heredoc, write the text with a file tool and pass --body-file, and keep file edits separate from test commands."
 fi
 
 # A safe pair of values: SQLite in memory, or any database named for testing.

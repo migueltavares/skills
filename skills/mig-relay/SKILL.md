@@ -60,7 +60,7 @@ Task: #<N> <title>. <Required behaviour, including any scope change from the che
 Where: <files and symbols as path:line>.
 Done when: <observable behaviour>, and <the project's check commands> are green.
 Stop and ask if: <a named file or symbol is missing> / <the fix needs changes outside this scope> / <an unrelated test goes red>.
-Workflow: <the project's workflow from AGENTS.md>. <Model and delegation rules from the project's instructions>. Mark #<N> done in <plan file> in the same commit or PR.
+Workflow: <the project's workflow from AGENTS.md>. <Model, effort and delegation rules from the project's instructions>. Mark #<N> done in <plan file> in the same commit or PR.
 Lessons that apply: <only the ones that bear on this task>.
 After this: <the remaining order, short>.
 Start with #<N>.
@@ -75,9 +75,10 @@ Keep "Lessons that apply" short. A lesson that has already appeared in three pro
 ## 4. Hand over
 
 1. Print the block.
-2. Print the loose ends: uncommitted worktrees, untracked files, open PRs, checks not run. Give each one a verdict, either "fix now: <what you would do>" or "leave, because <reason>". Print `Loose ends: none` when there are none.
-3. Send a push notification when the host has one (`PushNotification` in Claude Code): "<project>: next prompt ready, #<N>".
-4. Ask: "Open the next thread? Reply go." When any loose end says "fix now", ask instead: "Reply go to fix the loose ends marked fix now and open the next thread."
+2. Right next to the block, print one line naming the recommended model and effort for the next thread: `Next thread: <model>, <effort>. <One-sentence reason>.` Pick the orchestrator role from the project's `## Models` section or `~/.agents/mig/models.md`; when neither names an orchestrator row, fall back to this thread's model and effort and say so.
+3. Print the loose ends: uncommitted worktrees, untracked files, open PRs, checks not run. Give each one a verdict, either "fix now: <what you would do>" or "leave, because <reason>". Print `Loose ends: none` when there are none.
+4. Send a push notification when the host has one (`PushNotification` in Claude Code): "<project>: next prompt ready, #<N>".
+5. Ask: "Open the next thread? Reply go." When any loose end says "fix now", ask instead: "Reply go to fix the loose ends marked fix now and open the next thread."
 
 On "go", fix the loose ends marked "fix now" first. Then, in T3 Code, open a thread in the same project with `t3_thread_launch`:
 - the prompt as its first message;

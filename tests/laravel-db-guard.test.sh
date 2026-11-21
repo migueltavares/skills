@@ -181,5 +181,18 @@ check allow unsafe 'php artisan test' apply_patch
 check allow unsafe 'php artisan test' Edit
 check deny  unsafe 'php artisan test' shell
 
+# Deny reasons for destructive commands and optimize+test tell agents to use --body-file for prose.
+check_reason() {
+    local app=$1 cmd=$2 needle=$3 out
+    out=$(jq -nc --arg c "$cmd" --arg d "$tmp/$app" \
+        '{tool_name: "Bash", tool_input: {command: $c}, cwd: $d}' | bash "$guard")
+    case "$out" in
+        *"$needle"*) pass=$(( pass + 1 )) ;;
+        *) fail=$(( fail + 1 )); printf 'FAIL  missing %s in output for [%s] %s\n' "$needle" "$app" "$cmd" ;;
+    esac
+}
+check_reason plain 'gh pr create --body "never run php artisan migrate:fresh"' '--body-file'
+check_reason safe  'gh pr create --body "ran php artisan optimize and php artisan test"' '--body-file'
+
 printf '%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

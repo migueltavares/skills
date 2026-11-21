@@ -64,6 +64,8 @@ Classify it:
 
 With more than three independent findings, verify them in parallel read-only subagents (T3 Code `delegate_task`, or the host's own agent tool), grouped by file. Otherwise verify them one by one.
 
+In T3 Code, Gemini 3.8 Flash (`providerInstanceId: "antigravity"`, `thought_level=medium`) is a cheaper verifier for low and medium findings. Security and data loss findings stay with the main thread's model or Gemini 4 Neon.
+
 Done when each finding has a class and evidence: a `path:line` you read or a command you ran. A paraphrase of the review is not evidence.
 
 ## 3. Report

@@ -151,3 +151,5 @@ Loose ends: <PRs left unmerged> | <postponed deploys> | <retargeted PRs waiting 
 Next, run `mig-merged` with no PR numbers (and `from mig-merge`) to scan for older merged branches and worktrees left behind before this run, both local and remote. Show any candidates for confirmation, and leave alone branches with no merged PR or with an open PR.
 
 Then, after the report and sweep are done, invoke `mig-relay` once, when work remains in an order.
+
+Last, when `mig-merged` detached this thread's own worktree, remove it with `git -C <main checkout> worktree remove <path>`, the final command of the run.

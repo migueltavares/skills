@@ -72,7 +72,8 @@ When git reports `<headRefOid>` as an unknown revision, fetch it first with `git
 
 **5. Remove worktrees.** For each worktree on a merged branch:
 - Skip it when `git -C <path> status --porcelain` shows changes. It goes in the loose ends line.
-- In T3 Code, skip it when an open thread still uses it (`t3_worktree_list`, `t3_worktree_status`).
+- In T3 Code, skip it when another open thread still uses it (`t3_worktree_list`).
+- When it is the worktree this thread runs in (`t3_worktree_status` shows it attached), run `git -C <path> switch --detach origin/<default branch>` now, so step 6 can delete the branch. Remove the folder at the very end, as described under "Report and hand off".
 - Otherwise `git worktree remove <path>`.
 
 Then run `git worktree prune`.
@@ -94,3 +95,5 @@ Then:
 - The next step needs the user first (credentials, a server step, a decision): say exactly what, and stop.
 - Work remains in an order (a plan in `docs/handoff/`, open issues this thread was working through, a later phase): invoke `mig-relay` for the next prompt.
 - Nothing remains: stop after the report.
+
+When step 5 detached this thread's own worktree, its removal is the last command of the run, after the hand-off, because this thread's shell stops working once its folder is gone. Run `git -C <main checkout> worktree remove <path>`, then tell the user the worktree is gone and this thread is finished. Called with `from mig-merge`, leave it to `mig-merge`, which removes it after its own finish.

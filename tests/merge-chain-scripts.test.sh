@@ -23,7 +23,7 @@ check() {
         sed 's/^/    /' "$tmp/out"
     fi
 }
-has() { grep -q -- "$1" "${2:-$tmp/out}" && echo yes || echo no; }
+has() { grep -q -- "$1" "${2:-$tmp/out}" 2>/dev/null && echo yes || echo no; }
 
 fix="$tmp/fix"
 mkdir -p "$tmp/bin" "$fix"
@@ -47,10 +47,18 @@ case "$1 $2" in
         delay=$(cat "$FIX/delay-$wf" 2>/dev/null || echo 99)
         if [ "$n" -ge "$delay" ]; then out < "$FIX/runs-$wf.json"; else echo '[]' | out; fi ;;
     "run watch") exit "$(cat "$FIX/watch-$3.rc")" ;;
-    "run view") echo "log tail of run $3" ;;
+    "run view")
+        if [[ " $* " == *" --json "* ]]; then
+            [ -f "$FIX/view-$3.fail" ] && exit 1
+            jq -n --arg s "$(cat "$FIX/status-$3" 2>/dev/null || echo completed)" '{status: $s}' | out
+        else echo "log tail of run $3"; fi ;;
     "api graphql")
-        if [[ "$*" == *resolveReviewThread* ]]; then echo '{}'; else cat "$FIX/pages.json"; fi ;;
-    "api repos/"*) cat > "$FIX/reply-$(basename "$(dirname "$2")").json"; echo '{}' ;;
+        if [[ "$*" == *resolveReviewThread* ]]; then echo '{}'
+        elif [[ "$*" == *addPullRequestReviewThreadReply* ]]; then
+            id="" body=""
+            for a in "$@"; do case $a in id=*) id=${a#id=} ;; body=*) body=${a#body=} ;; esac; done
+            printf '%s' "$body" > "$FIX/reply-$id.txt"; echo '{}'
+        else cat "$FIX/pages.json"; fi ;;
     *) echo "stub gh: unexpected $*" >&2; exit 1 ;;
 esac
 EOF
@@ -91,6 +99,18 @@ check "deploy not watched after red CI" no "$(has 'run watch 11' "$fix/calls")"
 reset; echo 0 > "$fix/watch-22.rc"; echo 0 > "$fix/watch-11.rc"; echo 0 > "$fix/delay-ci.yml"; echo 1 > "$fix/delay-deploy.yml"
 check "green CI then deploy exits 0" 0 "$(wd --workflow deploy.yml --after ci.yml)"
 
+reset; echo 1 > "$fix/watch-11.rc"; echo 0 > "$fix/delay-deploy.yml"; touch "$fix/view-11.fail"
+check "watch transport error exits 5" 5 "$(wd --workflow deploy.yml)"
+rm "$fix/view-11.fail"; echo in_progress > "$fix/status-11"
+check "watch ending mid-run exits 5" 5 "$(wd --workflow deploy.yml)"
+rm "$fix/status-11"
+
+reset; echo 0 > "$fix/watch-11.rc"; echo 0 > "$fix/delay-deploy.yml"
+bash "$wait_deploy" --sha abc --workflow deploy.yml --timeout 08 >"$tmp/out" 2>&1
+check "timeout with a leading zero is decimal" 0 $?
+bash "$wait_deploy" --sha abc --workflow >"$tmp/out" 2>&1
+check "missing option value refused" 5 $?
+
 # ---------- pr-threads.sh collect ----------
 cat > "$fix/pages.json" <<'EOF'
 [
@@ -114,25 +134,42 @@ check "empty review bodies dropped" "ann" "$(jq -r '[.reviews[].author] | join("
 check "review decision kept" CHANGES_REQUESTED "$(jq -r .reviewDecision "$tmp/out")"
 check "long thread marked truncated" true "$(jq -r '.threads[] | select(.id == "T3") | .truncated' "$tmp/out")"
 check "incomplete when a thread is cut" false "$(jq -r .complete "$tmp/out")"
+
+# A read that stops before the last page, or across a head change, is incomplete.
+jq '[.[0]]' "$fix/pages.json" > "$fix/pages.one" && mv "$fix/pages.json" "$fix/pages.full" && mv "$fix/pages.one" "$fix/pages.json"
+bash "$pr_threads" collect 7 > "$tmp/out" 2>&1
+check "stopped paging is reported" yes "$(jq -r '.truncated | any(test("before its last page"))' "$tmp/out" | sed 's/true/yes/')"
+jq '.[1].data.repository.pullRequest.headRefOid = "h2"' "$fix/pages.full" > "$fix/pages.json"
+bash "$pr_threads" collect 7 > "$tmp/out" 2>&1
+check "moving head is reported" yes "$(jq -r '.truncated | any(test("head moved"))' "$tmp/out" | sed 's/true/yes/')"
+mv "$fix/pages.full" "$fix/pages.json"
 check "repo read from gh, strings sent raw" yes "$(has '-f o=o -f r=r -F n=7' "$fix/calls")"
 
 # ---------- pr-threads.sh respond ----------
 reset
 # Reply text with words the Bash deny rules match must reach GitHub untouched.
 cat > "$tmp/actions.json" <<'EOF'
-[{"threadId":"T1","commentId":101,"body":"Fixed in abc1234: the API_KEY no longer reaches the log.","resolve":true},
- {"threadId":"T3","commentId":103,"body":"Out of scope, listed as a follow-up.","resolve":false}]
+[{"threadId":"T1","body":"Fixed in abc1234: the API_KEY no longer reaches the log.","resolve":true},
+ {"threadId":"T3","body":"Out of scope, listed as a follow-up.","resolve":false}]
 EOF
 bash "$pr_threads" respond 7 "$tmp/actions.json" --repo o/r > "$tmp/out" 2>&1
 check "respond exits 0" 0 $?
-check "reply body sent intact" "Fixed in abc1234: the API_KEY no longer reaches the log." "$(jq -r .body "$fix/reply-101.json")"
+check "reply body sent intact" "Fixed in abc1234: the API_KEY no longer reaches the log." "$(cat "$fix/reply-T1.txt")"
+check "reply keyed by thread" yes "$([ -f "$fix/reply-T3.txt" ] && echo yes || echo no)"
 check "resolved when asked" yes "$(has '^RESOLVED T1')"
 check "left open when not asked" no "$(has '^RESOLVED T3')"
 check "one resolve call" 1 "$(grep -c resolveReviewThread "$fix/calls")"
 
-echo '[{"threadId":"T1","body":"no comment id"}]' > "$tmp/bad.json"
+echo '[{"threadId":"T1","body":"ok","resolve":"true"}]' > "$tmp/bad.json"
+rm -f "$fix/calls"
 bash "$pr_threads" respond 7 "$tmp/bad.json" --repo o/r > "$tmp/out" 2>&1
-check "malformed actions refused" 1 $?
+check "string resolve flag refused" 1 $?
+check "nothing sent for a bad file" no "$(has 'graphql' "$fix/calls")"
+echo '[{"threadId":"T1","body":"ok"},{"threadId":"T2","body":""}]' > "$tmp/bad.json"
+bash "$pr_threads" respond 7 "$tmp/bad.json" --repo o/r > "$tmp/out" 2>&1
+check "empty reply refused" 1 $?
+bash "$pr_threads" respond 7 "$tmp/actions.json" --repo > "$tmp/out" 2>&1
+check "--repo without a value refused" 1 $?
 echo '[{"threadId":"@/etc/passwd","commentId":1,"body":"x"}]' > "$tmp/bad.json"
 bash "$pr_threads" respond 7 "$tmp/bad.json" --repo o/r > "$tmp/out" 2>&1
 check "file-reading thread id refused" 1 $?

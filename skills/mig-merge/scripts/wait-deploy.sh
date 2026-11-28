@@ -8,7 +8,9 @@
 # --after names the workflow the deploy waits for (a workflow_run trigger). Its
 # run is watched first, so a red CI fails fast instead of waiting out the clock.
 # --timeout is how long to wait for each run to appear, default 600 seconds.
-# Prints "RUN <workflow> <id> <url>" as soon as a run exists.
+# Prints "RUN <workflow> <id> <url>" as soon as a run exists. The run watched is
+# the newest one of <workflow> on <sha>; mig-merge merges one PR at a time, so
+# that run belongs to this merge.
 #
 # Exit codes: 0 deployed, 1 the deploy failed (the failed log tail follows),
 # 2 the --after workflow failed, 3 no run appeared in time, 4 the workflow is
@@ -23,11 +25,13 @@ sha="" workflow="" after="" timeout=600 repo=""
 interval=${WAIT_DEPLOY_INTERVAL:-10}
 while [ $# -gt 0 ]; do
     case $1 in
-        --sha) sha=${2:-}; shift ;;
-        --workflow) workflow=${2:-}; shift ;;
-        --after) after=${2:-}; shift ;;
-        --timeout) timeout=${2:-}; shift ;;
-        --repo) repo=${2:-}; shift ;;
+        --sha|--workflow|--after|--timeout|--repo)
+            [ $# -ge 2 ] && [ -n "$2" ] || die "$1 needs a value"
+            case $1 in
+                --sha) sha=$2 ;; --workflow) workflow=$2 ;; --after) after=$2 ;;
+                --timeout) timeout=$2 ;; --repo) repo=$2 ;;
+            esac
+            shift ;;
         -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
         *) die "unknown argument: $1" ;;
     esac
@@ -35,16 +39,26 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$sha" ] && [ -n "$workflow" ] || die "--sha and --workflow are required"
 [[ "$timeout" =~ ^[0-9]+$ ]] || die "--timeout takes seconds"
+timeout=$((10#$timeout))
 R=()
 [ -n "$repo" ] && R=(--repo "$repo")
 
-state=$(gh workflow list --all "${R[@]+"${R[@]}"}" --json path,state \
+state=$(gh workflow list --all --limit 1000 "${R[@]+"${R[@]}"}" --json path,state \
     --jq ".[] | select(.path | endswith(\"/$workflow\")) | .state") || die "gh workflow list failed"
 case $state in
     active) ;;
     "") echo "MISSING workflow $workflow"; exit 4 ;;
     *) echo "DISABLED workflow $workflow ($state): it deploys nothing until it is enabled"; exit 4 ;;
 esac
+
+# watch <id>: 0 when the run succeeded, 1 when it finished any other way, 5 when gh failed.
+watch() {
+    gh run watch "${R[@]+"${R[@]}"}" "$1" --exit-status >/dev/null && return 0
+    local st
+    st=$(gh run view "${R[@]+"${R[@]}"}" "$1" --json status --jq .status) || return 5
+    [ "$st" = completed ] && return 1
+    return 5
+}
 
 # find_run <workflow>: prints "<id> <url>" for the newest run on $sha, waiting up to $timeout.
 find_run() {
@@ -63,8 +77,10 @@ if [ -n "$after" ]; then
     [ "$rc" -eq 5 ] && exit 5
     [ "$rc" -ne 0 ] && { echo "NO RUN of $after for $sha after ${timeout}s"; exit 3; }
     echo "RUN $after $ci"
-    if ! gh run watch "${R[@]+"${R[@]}"}" "${ci%% *}" --exit-status >/dev/null; then
-        echo "FAILED $after run ${ci%% *}: the deploy will not start"
+    watch "${ci%% *}"; rc=$?
+    [ "$rc" -eq 5 ] && die "gh could not watch run ${ci%% *}"
+    if [ "$rc" -ne 0 ]; then
+        echo "FAILED $after run ${ci%% *}. A deploy that waits for it to pass won't run; check the deploy workflow's condition."
         gh run view "${R[@]+"${R[@]}"}" "${ci%% *}" --log-failed 2>/dev/null | tail -50
         exit 2
     fi
@@ -77,7 +93,9 @@ if [ "$rc" -ne 0 ]; then
     exit 3
 fi
 echo "RUN $workflow $run"
-if gh run watch "${R[@]+"${R[@]}"}" "${run%% *}" --exit-status >/dev/null; then
+watch "${run%% *}"; rc=$?
+[ "$rc" -eq 5 ] && die "gh could not watch run ${run%% *}"
+if [ "$rc" -eq 0 ]; then
     echo "DEPLOYED run ${run%% *}"
     exit 0
 fi

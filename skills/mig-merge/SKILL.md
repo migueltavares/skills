@@ -51,7 +51,7 @@ Show the order as a numbered list, one line of reasoning per PR, then start.
 
 **a. Gate.** Read the state, the checks and the unresolved review threads.
 
-- In T3 Code: `pull_request_read` with `include: ["checks", "threads", "body"]`. It has no review decision, so also run `gh pr view <n> --json reviewDecision`.
+- In T3 Code: `pull_request_read` with `include: ["checks", "threads", "comments", "body"]`. When it returns a cursor or says a list was cut short, read the next page before judging. It has no review decision, so also run `gh pr view <n> --json reviewDecision`.
 - Elsewhere:
 
   ```bash
@@ -111,7 +111,7 @@ A failed deploy stops the whole run, and leaves the remaining PRs unmerged. Show
 bash <mig-merged dir>/scripts/cleanup.sh [--skip-worktree <path>]... <n>
 ```
 
-In T3 Code, pass `--skip-worktree` for each worktree another thread uses, found as `mig-merged` step 2 describes. Exit 0: done. Exit 3: invoke `mig-merged` with `<n> from mig-merge` to handle the lines the script handed back. Never replace the script or `mig-merged` with a hand-rolled cleanup.
+In T3 Code, pass `--skip-worktree` for each worktree another thread uses, found as `mig-merged` step 2 describes. Exit 0: done. Exit 3: invoke `mig-merged` with `<n> from mig-merge` to handle the lines the script handed back. Exit 1: git or gh failed; show the `STOP` lines and stop the run. Never replace the script or `mig-merged` with a hand-rolled cleanup.
 
 A PR is done when it is merged, its deploy is confirmed healthy, and its cleanup ran.
 

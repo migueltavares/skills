@@ -5,21 +5,28 @@
 #
 # Usage:
 #   cleanup.sh [--plan] [--skip-worktree <path>]... <pr>...
-#       Clean up after these PRs. --plan reports what would happen and changes
-#       nothing. --skip-worktree keeps a worktree that another thread uses.
+#       Clean up after these PRs. --plan reports what would happen and deletes
+#       nothing. --skip-worktree protects a checkout another thread uses, the
+#       main checkout included: it is neither switched, removed, nor has its
+#       branch deleted.
 #   cleanup.sh
-#       Sweep: list merged branches and worktrees left behind. Changes nothing.
+#       Sweep: list merged branches and worktrees left behind. Deletes nothing.
 #
-# Run it from any checkout of the repo; it works in the main checkout. The
-# worktree the caller's shell runs in is detached, never removed: the caller
-# removes it as its last command, with the line this script prints.
+# Both read-only modes still fetch from origin. Run the script from any checkout
+# of the repo; it works in the main checkout. The worktree the caller's shell
+# runs in is detached, never removed: the caller removes it last, with the
+# command on the LAST line.
 #
-# Exit codes: 0 nothing is left for the agent, 3 at least one line needs the
-# agent (it is repeated in the final "Loose ends:" line), 1 git or gh failed.
+# A worktree holding untracked files, or ignored files beyond dependencies,
+# build output, caches and .env copies, is kept and reported.
+#
+# Exit codes: 0 nothing is left for the agent, 3 a line needs the agent (it is
+# repeated in the final "Loose ends:" line), 1 git or gh failed (a STOP line
+# says where; everything else that ran is reported too).
 
 set -uo pipefail
 
-die() { echo "ERROR $*" >&2; exit 1; }
+die() { echo "STOP $*"; echo "Loose ends: STOP $*"; exit 1; }
 
 plan=false
 skips=()
@@ -28,14 +35,13 @@ while [ $# -gt 0 ]; do
     case $1 in
         --plan) plan=true ;;
         --skip-worktree) [ $# -ge 2 ] || die "--skip-worktree needs a path"; skips+=("$(realpath -m "$2")"); shift ;;
-        -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
-        \#[0-9]*|[0-9]*) prs+=("${1#\#}") ;;
-        *) die "unknown argument: $1" ;;
+        -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
+        *) [[ "$1" =~ ^#?[0-9]+$ ]] || die "unknown argument: $1"; prs+=("${1#\#}") ;;
     esac
     shift
 done
 
-for tool in git gh jq; do
+for tool in git gh jq realpath; do
     command -v "$tool" >/dev/null || die "$tool is not installed"
 done
 
@@ -48,11 +54,15 @@ ghm() { (cd "$main" && gh "$@"); }
 
 loose=()
 need=0
+failed=0
 detached=""
 say() { echo "$*"; }
 flag() { echo "$*"; loose+=("$*"); need=1; }
+stop() { echo "STOP $*"; loose+=("STOP $*"); failed=1; }
 finish() {
-    [ -n "$detached" ] && say "LAST git -C $main worktree remove $detached"
+    if [ -n "$detached" ]; then
+        printf 'LAST git -C %q worktree remove %q\n' "$main" "$detached"
+    fi
     if [ ${#loose[@]} -eq 0 ]; then
         echo "Loose ends: none"
     else
@@ -60,6 +70,7 @@ finish() {
         joined=$(printf ' | %s' "${loose[@]}")
         echo "Loose ends:${joined# |}"
     fi
+    [ "$failed" -eq 1 ] && exit 1
     [ "$need" -eq 1 ] && exit 3
     exit 0
 }
@@ -79,16 +90,36 @@ worktrees_on() {
 
 has_commit() { g cat-file -e "$1^{commit}" 2>/dev/null; }
 
+# Ignored files that are not dependencies, build output, caches or .env copies.
+# Those are the only ignored files a worktree removal may delete.
+precious_ignored() {
+    git -C "$1" status --porcelain --ignored=matching --untracked-files=normal 2>/dev/null \
+        | sed -n 's/^!! //p' \
+        | grep -vE '^(vendor|node_modules|public/build|public/hot|bootstrap/cache|storage|coverage|dist|build|\.next|\.nuxt|\.turbo|\.cache|\.phpunit\.cache|\.playwright-mcp)(/|$)|^\.phpunit\.result\.cache$|^\.env(\.[A-Za-z0-9_.-]+)?$|\.log$' \
+        | head -3
+}
+
+# Open PRs that use branch $1 as head or base, read live just before acting.
+open_prs_on() {
+    ghm pr list --state open --limit 1000 --json number,headRefName,baseRefName \
+        | jq -r --arg b "$1" '[.[] | select(.headRefName == $b or .baseRefName == $b) | "#\(.number)"] | join(" ")'
+}
+
+# gh and git must point at the same repository, or the PR checks prove nothing
+# about the branches being deleted.
+gh_repo=$(ghm repo view --json nameWithOwner --jq .nameWithOwner) || die "gh repo view failed"
+for url in "$(g remote get-url origin)" "$(g remote get-url --push origin)"; do
+    slug=$(sed -E 's#^(git@[^:]+:|ssh://[^/]+/|https?://[^/]+/)##; s#\.git$##' <<<"$url")
+    [ "${slug,,}" = "${gh_repo,,}" ] || die "gh uses $gh_repo but origin is $url. Run gh repo set-default, or fix origin."
+done
+
 g fetch -q --prune origin || die "git fetch origin failed in $main"
-default=$(g symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)
-default=${default#origin/}
-[ -n "$default" ] || default=$(g ls-remote --symref origin HEAD | awk '/^ref:/{sub("refs/heads/", "", $2); print $2; exit}')
-[ -n "$default" ] || die "cannot tell the default branch of origin"
+default=$(g ls-remote --symref origin HEAD | awk '/^ref:/{sub("refs/heads/", "", $2); print $2; exit}')
+[ -n "$default" ] || die "cannot read origin's default branch"
 
-open_json=$(ghm pr list --state open --limit 1000 --json number,headRefName,baseRefName) || die "gh pr list failed"
-
-# ---------- Sweep: list candidates, change nothing ----------
+# ---------- Sweep: list candidates, delete nothing ----------
 if [ ${#prs[@]} -eq 0 ]; then
+    open_json=$(ghm pr list --state open --limit 1000 --json number,headRefName,baseRefName) || die "gh pr list failed"
     merged_json=$(ghm pr list --state merged --limit 1000 --json number,headRefName,headRefOid) || die "gh pr list failed"
     found=0
     while read -r b; do
@@ -119,126 +150,165 @@ if [ ${#prs[@]} -eq 0 ]; then
 fi
 
 # ---------- Update the default branch in the main checkout ----------
-if $plan; then
+main_branch=$(g branch --show-current)
+if is_skipped "$main"; then
+    say "KEPT $main as it is: another thread uses it, so $default was not updated there"
+elif $plan; then
     say "WOULD update $default in $main"
 else
-    if [ "$(g branch --show-current)" != "$default" ]; then
-        g switch -q "$default" 2>/dev/null || { flag "STOP $main cannot switch to $default: commit or stash its changes, then run this again"; finish; }
+    if [ "$main_branch" != "$default" ]; then
+        if g switch -q "$default" 2>/dev/null; then
+            main_branch=$default
+        else
+            flag "KEPT $main on $main_branch: it can't switch to $default (uncommitted changes?)"
+        fi
     fi
-    g pull -q --ff-only || { flag "STOP git pull --ff-only failed in $main"; finish; }
-    say "UPDATED $default in $main at $(g rev-parse --short HEAD)"
-    changes=$(g status --porcelain | wc -l)
-    [ "$changes" -gt 0 ] && say "NOTE $changes uncommitted files in $main came along"
+    if [ "$main_branch" = "$default" ]; then
+        if g merge -q --ff-only "origin/$default" 2>/dev/null; then
+            say "UPDATED $default in $main at $(g rev-parse --short HEAD)"
+            changes=$(g status --porcelain | wc -l)
+            [ "$changes" -gt 0 ] && say "NOTE $changes uncommitted files in $main came along"
+        else
+            flag "KEPT $default in $main: it can't fast-forward to origin/$default"
+        fi
+    fi
 fi
 
 # ---------- Each PR ----------
 for n in "${prs[@]}"; do
-    pr=$(ghm pr view "$n" --json state,headRefName,headRefOid,isCrossRepository,body,closingIssuesReferences) || { flag "STOP gh pr view $n failed"; continue; }
+    pr=$(ghm pr view "$n" --json state,headRefName,headRefOid,baseRefName,isCrossRepository,body,closingIssuesReferences) \
+        || { stop "gh pr view $n failed"; continue; }
     state=$(jq -r .state <<<"$pr")
     b=$(jq -r .headRefName <<<"$pr")
     oid=$(jq -r .headRefOid <<<"$pr")
+    base=$(jq -r .baseRefName <<<"$pr")
     fork=$(jq -r .isCrossRepository <<<"$pr")
 
     if [ "$state" != "MERGED" ]; then
         flag "SKIP #$n is $state, not merged"
         continue
     fi
-    if [ "$b" = "$default" ]; then
-        flag "SKIP #$n: its head is the default branch"
-        continue
+    if [ "$b" = "$default" ] || [ "$fork" = true ]; then
+        say "KEPT the head branch of #$n: $( [ "$fork" = true ] && echo "it lives in a fork" || echo "it is the default branch")"
+        b=""
     fi
 
     keep=false
-    reused=$(jq -r --arg b "$b" '[.[] | select(.headRefName == $b) | "#\(.number)"] | join(" ")' <<<"$open_json")
-    stacked=$(jq -r --arg b "$b" '[.[] | select(.baseRefName == $b) | "#\(.number)"] | join(" ")' <<<"$open_json")
-
-    if [ -n "$stacked" ]; then
-        flag "STACKED $stacked on $b: retarget to $default, then run this again for #$n"
-        keep=true
+    if [ -n "$b" ]; then
+        if ! on=$(open_prs_on "$b"); then
+            stop "gh pr list failed for $b"; keep=true
+        elif [ -n "$on" ]; then
+            flag "OPEN $on uses $b as head or base: retarget or merge it first, then run this again for #$n"
+            keep=true
+        fi
+        if ! has_commit "$oid" && ! g fetch -q origin "pull/$n/head"; then
+            stop "#$n: cannot fetch its head $oid"; keep=true
+        fi
+        for ref in "refs/heads/$b" "refs/remotes/origin/$b"; do
+            g show-ref -q --verify "$ref" || continue
+            if ! late=$(g log --format=%h "$oid..$ref"); then
+                stop "git log $oid..$ref failed"; keep=true; continue
+            fi
+            [ -z "$late" ] && continue
+            flag "LATE ${ref#refs/*/} has $(wc -l <<<"$late") commits not in #$n: $(echo $late)"
+            keep=true
+        done
+        if [ "$main_branch" = "$b" ]; then
+            say "KEPT $b: the main checkout $main is on it"
+            keep=true
+        fi
     fi
-    if [ -n "$reused" ]; then
-        say "KEPT $b: open PR $reused uses this branch name"
-        keep=reused
-    fi
 
-    if ! has_commit "$oid" && ! g fetch -q origin "pull/$n/head"; then
-        flag "STOP #$n: cannot fetch its head $oid"
-        continue
-    fi
-    for ref in "refs/heads/$b" "refs/remotes/origin/$b"; do
-        g show-ref -q --verify "$ref" || continue
-        late=$(g log --format=%h "$oid..$ref")
-        [ -z "$late" ] && continue
-        [ "$keep" = reused ] && continue
-        flag "LATE ${ref#refs/*/} has $(wc -l <<<"$late") commits not in #$n: $(echo $late)"
-        keep=true
-    done
-
-    # Worktrees on the branch. A reused branch name belongs to the open PR.
-    if [ "$keep" != reused ]; then
+    # Worktrees on the branch, only when the branch itself can go.
+    if [ -n "$b" ] && [ "$keep" = false ]; then
         while read -r path; do
             [ -n "$path" ] || continue
             path=$(realpath "$path")
             [ "$path" = "$main" ] && continue
+            extra=$(precious_ignored "$path")
             if is_skipped "$path"; then
                 say "KEPT worktree $path: another thread uses it"
                 keep=true
             elif [ -n "$(git -C "$path" status --porcelain)" ]; then
                 flag "DIRTY $path has uncommitted changes: commit or drop them"
                 keep=true
+            elif [ -n "$extra" ]; then
+                flag "DIRTY $path holds ignored files such as $(echo $extra): keep or delete them by hand"
+                keep=true
             elif [ "$path" = "$caller" ]; then
                 if $plan; then
                     say "WOULD detach $path, this shell's worktree"
-                else
-                    git -C "$path" switch -q --detach "origin/$default" || { flag "STOP cannot detach $path"; keep=true; continue; }
+                elif git -C "$path" switch -q --detach "origin/$default"; then
                     say "DETACHED $path, this shell's worktree"
                     detached=$path
+                else
+                    stop "cannot detach $path"; keep=true
                 fi
             elif $plan; then
                 say "WOULD remove worktree $path"
+            elif g worktree remove "$path"; then
+                say "REMOVED worktree $path"
             else
-                g worktree remove "$path" && say "REMOVED worktree $path" || { flag "STOP git worktree remove $path failed"; keep=true; }
+                stop "git worktree remove $path failed"; keep=true
             fi
         done < <(worktrees_on "$b")
-        $plan || g worktree prune
     fi
 
     # Branches, only when nothing above asked to keep them.
-    if [ "$keep" = false ]; then
-        if g show-ref -q --verify "refs/heads/$b"; then
-            if ! g merge-base --is-ancestor "refs/heads/$b" "$oid"; then
+    if [ -n "$b" ] && [ "$keep" = false ]; then
+        if tip=$(g rev-parse -q --verify "refs/heads/$b"); then
+            if [ -n "$(worktrees_on "$b")" ]; then
+                say "KEPT local $b: a worktree still has it checked out"
+            elif ! g merge-base --is-ancestor "$tip" "$oid"; then
                 flag "LATE $b: not contained in #$n, kept"
             elif $plan; then
                 say "WOULD delete local $b"
+            elif g update-ref -d "refs/heads/$b" "$tip"; then
+                # update-ref deletes only while the branch still points at the tip checked above.
+                say "DELETED local $b"
             else
-                g branch -q -D "$b" && say "DELETED local $b" || flag "STOP git branch -D $b failed"
+                flag "CHANGED local $b moved while this ran: kept"
             fi
         fi
-        if [ "$fork" = true ]; then
-            say "KEPT the head branch of #$n: it lives in a fork"
+        # Read the live tip and open PRs again: a push or a new PR can land after the checks above.
+        live=$(g ls-remote --exit-code --heads origin "refs/heads/$b"); rc=$?
+        if [ "$rc" -eq 2 ]; then
+            say "GONE origin/$b: GitHub already removed it"
+        elif [ "$rc" -ne 0 ]; then
+            stop "git ls-remote origin failed for $b"
         else
-            # Read the live tip again: a push can land between the fetch and the delete.
-            live=$(g ls-remote --heads origin "refs/heads/$b" | cut -f1)
-            if [ -z "$live" ]; then
-                say "GONE origin/$b: GitHub already removed it"
-            elif ! has_commit "$live" || ! g merge-base --is-ancestor "$live" "$oid"; then
+            live=$(cut -f1 <<<"$live")
+            if ! has_commit "$live" || ! g merge-base --is-ancestor "$live" "$oid"; then
                 flag "CHANGED origin/$b moved to ${live:0:7}, which is not in #$n: kept"
+            elif ! on=$(open_prs_on "$b"); then
+                stop "gh pr list failed for $b"
+            elif [ -n "$on" ]; then
+                flag "OPEN $on uses $b as head or base: kept"
             elif $plan; then
                 say "WOULD delete origin/$b"
+            elif g push -q origin --delete "$b"; then
+                say "DELETED origin/$b"
             else
-                g push -q origin --delete "$b" && say "DELETED origin/$b" || flag "STOP git push origin --delete $b failed"
+                stop "git push origin --delete $b failed"
             fi
         fi
     fi
 
-    # Issues the PR closes, and "part of" wording that GitHub also treats as closing.
-    for i in $(jq -r '.closingIssuesReferences[].number' <<<"$pr"); do
-        st=$(ghm issue view "$i" --json state | jq -r .state) || { flag "STOP gh issue view $i failed"; continue; }
-        [ "$st" = "OPEN" ] && flag "ISSUE #$i is still open: close it if #$n delivered it, else comment what is left"
-    done
-    for i in $(jq -r .body <<<"$pr" | grep -oiE '(close[sd]?|fix(e[sd])?|resolve[sd]?) part of #[0-9]+' | grep -oE '[0-9]+$' | sort -u); do
-        flag "PARTIAL #$i: \"part of\" wording made GitHub close it. Reopen it with a comment if work is left"
-    done
+    # Issues the PR closes, named by URL so a cross-repo reference stays exact.
+    while read -r url; do
+        [ -n "$url" ] || continue
+        if ! st=$(ghm issue view "$url" --json state | jq -r .state); then
+            stop "gh issue view $url failed"; continue
+        fi
+        [ "$st" = "OPEN" ] && flag "ISSUE $url is still open: close it if #$n delivered it, else comment what is left"
+    done < <(jq -r '.closingIssuesReferences[].url' <<<"$pr")
+    # "Closes part of #N" also closes #N, but only on a merge into the default branch.
+    if [ "$base" = "$default" ]; then
+        for i in $(jq -r .body <<<"$pr" | grep -oiE '(close[sd]?|fix(e[sd])?|resolve[sd]?) part of #[0-9]+' | grep -oE '[0-9]+$' | sort -u); do
+            st=$(ghm issue view "$i" --json state | jq -r .state) || { stop "gh issue view $i failed"; continue; }
+            [ "$st" = "CLOSED" ] && flag "PARTIAL #$i was closed by \"part of\" wording in #$n. Reopen it with a comment if work is left"
+        done
+    fi
 done
 
 finish

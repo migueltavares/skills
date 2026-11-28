@@ -9,8 +9,9 @@
 #       and "complete": false with the reasons when anything was cut short.
 #   pr-threads.sh respond <pr> <actions.json> [--repo <owner/repo>]
 #       Replies to threads and resolves them. The file holds
-#       [{"threadId": "...", "commentId": 123, "body": "...", "resolve": true}].
+#       [{"threadId": "PRRT_...", "body": "...", "resolve": true}].
 #       Write it with a file tool: reply text never passes through the shell.
+#       The whole file is checked before anything is sent.
 #
 # Exit codes: 0 done, 1 a gh call failed or the input was wrong.
 
@@ -27,7 +28,7 @@ file=""
 repo=""
 while [ $# -gt 0 ]; do
     case $1 in
-        --repo) repo=${2:-}; shift ;;
+        --repo) [ $# -ge 2 ] && [ -n "$2" ] || die "--repo needs <owner/repo>"; repo=$2; shift ;;
         *) [ -z "$file" ] && file=$1 || die "unknown argument: $1" ;;
     esac
     shift
@@ -63,6 +64,8 @@ collect)
           reviews: [$first.reviews.nodes[] | select(.body != "") | {author: .author.login, association: .authorAssociation, state, body, commit: .commit.oid}],
           comments: [$first.comments.nodes[] | {author: .author.login, association: .authorAssociation, body}],
           truncated: ([
+              (if ($p | last | .reviewThreads.pageInfo.hasNextPage) then "the thread list stopped before its last page" else empty end),
+              (if ([$p[].headRefOid] | unique | length) > 1 then "the head moved while the threads were read" else empty end),
               ($open[] | select(.comments.totalCount > (.comments.nodes | length)) | "thread \(.id) has more than 50 comments"),
               (if $first.reviews.totalCount > 50 then "only the last 50 of \($first.reviews.totalCount) reviews" else empty end),
               (if $first.comments.totalCount > 100 then "only the last 100 of \($first.comments.totalCount) PR comments" else empty end)
@@ -72,20 +75,23 @@ collect)
     ;;
 respond)
     [ -n "$file" ] && [ -f "$file" ] || die "respond needs an actions file"
-    jq -e 'type == "array" and all(.[]; (.threadId | type == "string" and test("^[A-Za-z0-9_-]+$")) and (.commentId | type == "number" and . > 0 and floor == .) and (.body | type == "string"))' "$file" >/dev/null \
-        || die "$file must be an array of {threadId, commentId, body, resolve}"
+    jq -e 'type == "array" and all(.[]; (.threadId | type == "string" and test("^[A-Za-z0-9_-]+$"))
+            and (.body | type == "string" and length > 0) and ((.resolve // false) | type == "boolean"))' "$file" >/dev/null \
+        || die "$file must be an array of {threadId, body, resolve: true or false}"
     failed=0
     count=$(jq length "$file")
     for ((k = 0; k < count; k++)); do
         item=$(jq -c ".[$k]" "$file")
         thread=$(jq -r .threadId <<<"$item")
-        comment=$(jq -r .commentId <<<"$item")
-        if jq '{body}' <<<"$item" | gh api "repos/$owner/$name/pulls/$pr/comments/$comment/replies" --input - >/dev/null; then
+        body=$(jq -r .body <<<"$item")
+        # The reply is keyed by the thread, like the resolve, so both act on the same conversation.
+        if gh api graphql -f id="$thread" -f body="$body" \
+            -f query='mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$body}){comment{id}}}' >/dev/null; then
             echo "REPLIED $thread"
         else
             echo "FAILED reply $thread"; failed=1; continue
         fi
-        if [ "$(jq -r '.resolve // false' <<<"$item")" = true ]; then
+        if [ "$(jq '.resolve // false' <<<"$item")" = true ]; then
             if gh api graphql -f id="$thread" -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' >/dev/null; then
                 echo "RESOLVED $thread"
             else

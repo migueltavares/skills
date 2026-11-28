@@ -1,6 +1,6 @@
 ---
 name: mig-audit-codebase
-description: Audit an app for security, performance and reliability problems, verify each finding, file the confirmed ones as issues, and write a safe work order. Use for /mig-audit-codebase, "audit this app", "security review of the whole codebase", or "turn the audit into issues". Add "invisible" for apps whose staff are already trained.
+description: Audit an app for security, performance and reliability problems, verify each finding, file the confirmed ones as issues, and write a safe work order. Use for /mig-audit-codebase, "audit this app", "security review of the whole codebase", or "turn the audit into issues".
 metadata:
   credits:
     - skill: triage, to-tickets

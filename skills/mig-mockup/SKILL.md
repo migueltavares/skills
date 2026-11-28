@@ -28,7 +28,7 @@ Read the project's AGENTS.md and any earlier design decisions in `docs/handoff/`
 
 List every page and state in scope (empty, error, logged out, the landing page, each role's view) and confirm the list with the user before building.
 
-Then look at what exists today. Screenshot each current page at 1440 and 390 with `node <skill-dir>/scripts/check.mjs <url> --out mockups/<slug>/shots` (`<skill-dir>` is this skill's absolute installed path), and read the live CSS for the container or wrapper width, base font size, sidebar width and brand colours. The options keep those unless the user asks to change them. When they conflict with a design doc, show both and ask which wins.
+Then look at what exists today. Screenshot every current page at 1440 and 390 in one run, `node <skill-dir>/scripts/check.mjs <url>... --out mockups/<slug>/shots` (`<skill-dir>` is this skill's absolute installed path). States that share a path, such as an empty and a filled list, each need a name: `--page before-empty=<url>`. Then read the live CSS for the container or wrapper width, base font size, sidebar width and brand colours. The options keep those unless the user asks to change them. When they conflict with a design doc, show both and ask which wins.
 
 ## 2. Build the options
 
@@ -46,7 +46,10 @@ Run the check script on the folder:
 
 ```bash
 node <skill-dir>/scripts/check.mjs mockups/<slug>
+node <skill-dir>/scripts/check.mjs mockups/<slug>/index.html --out mockups/<slug>/shots/index
 ```
+
+The folder run leaves out `index.html`, which is the screen the user chooses from, so check it on its own once its images exist.
 
 It loads each option at 1440 and 390 in headless Chrome, saves screenshots to `mockups/<slug>/shots/`, and exits 1 when a page scrolls sideways, naming the elements that stick out. Look at the screenshots too: fix clipped text, broken wrapping and unreadable contrast before the user sees anything. The index thumbnails can use these screenshots.
 

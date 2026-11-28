@@ -1,6 +1,6 @@
 ---
 name: mig-pt-pt
-description: Write, translate or review text in European Portuguese (pt-PT), removing Brazilian forms and AI tells. Use for any Portuguese UI string, email, page copy, lang file or translation, for sites with a PT locale, and for /mig-pt-pt.
+description: Write, translate or review text in European Portuguese (pt-PT), removing Brazilian forms and AI tells. Use when the task writes, translates or reviews Portuguese text, such as UI strings, lang files, emails or page copy, and for /mig-pt-pt.
 metadata:
   credits:
     - skill: unslop
@@ -33,7 +33,7 @@ bash <skill-dir>/scripts/check-pt.sh lang/pt_PT                          # files
 printf '%s\n' "Guarde o ficheiro" "A carregar..." | bash <skill-dir>/scripts/check-pt.sh -   # loose strings
 ```
 
-With no arguments it checks the usual Laravel `pt_PT` and `pt` lang folders. It prints each possible Brazilian form with the European one. A few hits are correct in another sense (arquivo as an archive), so fix each hit or say why it stays.
+With no arguments it checks the usual Laravel `pt_PT` and `pt` lang folders. It prints each possible Brazilian form with the European one. A few hits are correct in another sense (arquivo as an archive, fato as a suit), so fix each hit or say why it stays.
 
 ## Grammar
 

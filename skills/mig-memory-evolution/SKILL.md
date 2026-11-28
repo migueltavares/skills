@@ -22,7 +22,14 @@ metadata:
 
 Agents save feedback per project, so the same rule ends up in four or five memory folders, worded a little differently each time. A rule that lives in five places gets applied in five ways and fixed in one. This skill finds those rules and gives each one a single home.
 
-## 1. Read every memory
+## 1. Read the memories
+
+The log of earlier runs is `~/.agents/mig/memory-evolution.md`. Read its last `## <date>` entry: the decisions already made, the contradictions left open, and the items pending a merge.
+
+- With a log entry, read in full only the notes changed since that date: `find ~/.claude/projects/*/memory -name '*.md' ! -name MEMORY.md -newermt <date>`, and the Codex files the same way. Read every `MEMORY.md` index too, so a changed note can be grouped with older notes that state the same rule, and open those older notes when they do.
+- With no log, or when the user asks for a full pass, read every note.
+
+Where the notes live:
 
 - Claude Code: `~/.claude/projects/*/memory/*.md`, plus each folder's `MEMORY.md` index. The folder names start with `-home`, so pass paths after `--` (`cat -- "$f"`, `grep -- pattern "$f"`).
 - Codex: `~/.codex/memories/`, when it exists.
@@ -51,11 +58,11 @@ Show the proposal as a table: the rule, how many projects, the home, the change.
 
 1. Write the rule into its new home, in that file's own style.
 2. For a skill change, edit the skill in its repo and open a PR, rather than editing an installed copy that updates will overwrite.
-3. Run `mig-mode` setup again when `rules.local.md` changed, so Codex gets the new text.
+3. When `rules.local.md` changed, run `bash <mig-mode skill dir>/scripts/setup.sh`, then the same with `--check`, so Codex and Antigravity get the new text. `mig-mode` itself can't be invoked by the model.
 4. Delete the per-project memory files the rule replaces, and remove their lines from each `MEMORY.md` index, only once the new home is live: the file is written and loaded, or the skill PR is merged and installed.
 
 Never delete a memory the user didn't approve, and never one that holds project history beyond the rule itself. Trim that kind instead.
 
 ## Report
 
-One line per change: the rule, its new home, and the memory files removed. Then the contradictions still open, and the date, so the next run can start from what changed since.
+One line per change: the rule, its new home, and the memory files removed. Then the contradictions still open, the deletions waiting on a merge, and the date. Append the same report to `~/.agents/mig/memory-evolution.md` under a `## <date>` heading, so the next run starts from what changed since.

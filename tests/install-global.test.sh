@@ -52,5 +52,28 @@ check "claude hook repointed" "$guard" "$(hook_command "$tmp/.claude/settings.js
 check "codex hook repointed" "$guard" "$(hook_command "$tmp/.codex/hooks.json")"
 check "check passes after repoint" 0 "$(run --check)"
 
+# With the mig-skills plugin enabled, the plugin's hook covers Claude Code.
+rm -rf "$tmp/.claude" "$tmp/.codex"; mkdir -p "$tmp/.claude" "$tmp/.codex/rules"
+echo '{"enabledPlugins": {"mig-skills@mig": true}}' > "$tmp/.claude/settings.json"
+check "plugin: install succeeds" 0 "$(run)"
+check "plugin: no second claude hook" null "$(hook_command "$tmp/.claude/settings.json")"
+check "plugin: deny rules still added" 4 "$(jq '[.permissions.deny[] | select(contains("artisan"))] | length' "$tmp/.claude/settings.json")"
+check "plugin: check passes" 0 "$(run --check)"
+grep -q '^OK *claude hook comes from the mig-skills plugin' "$tmp/out"
+check "plugin: check names the plugin" 0 $?
+jq --arg g "$guard" '.hooks.PreToolUse += [{"matcher": "Bash", "hooks": [{"type": "command", "command": $g}]}]' \
+    "$tmp/.claude/settings.json" > "$tmp/s.json" && mv "$tmp/s.json" "$tmp/.claude/settings.json"
+run --check >/dev/null
+grep -q '^NOTE *claude hook .* second time' "$tmp/out"
+check "plugin: duplicate hook reported" 0 $?
+
+# --check changes nothing, not even the guard's execute bit.
+mkdir -p "$tmp/copy"
+cp "$repo/skills/mig-laravel-guardrails/scripts/"*.sh "$tmp/copy/"
+chmod -x "$tmp/copy/laravel-db-guard.sh"
+HOME="$tmp" CODEX_HOME="$tmp/.codex" bash "$tmp/copy/install-global.sh" --check >"$tmp/out" 2>&1
+check "check fails on a guard that can't run" 1 $?
+check "check leaves the execute bit alone" no "$([ -x "$tmp/copy/laravel-db-guard.sh" ] && echo yes || echo no)"
+
 echo "install-global: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

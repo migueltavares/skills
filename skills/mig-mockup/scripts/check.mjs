@@ -2,8 +2,9 @@
 // Screenshot mockups at desktop and phone widths and flag horizontal overflow.
 // Needs Node 22 or later (built-in WebSocket) and Chrome or Chromium. No npm packages.
 //
-// Usage: node check.mjs <file.html | folder | http URL>... [--out <dir>] [--widths 1440,390]
+// Usage: node check.mjs <file.html | folder | http URL>... [--page <name>=<URL>]... [--out <dir>] [--widths 1440,390]
 // A folder means every .html file in it except index.html. A URL is the current page, saved as before-<host>-<path>.
+// --page names a state that shares a path with another, such as --page before-empty=https://app.test/list?state=empty.
 // Screenshots go to <out>/<name>-<width>.png (default: shots/ next to the first input).
 // Exit code 0: every page fits. 1: a page overflows or failed to load. 2: usage or setup error.
 
@@ -23,9 +24,20 @@ const flag = (name, fallback) => {
 };
 const widths = flag('--widths', '1440,390').split(',').map(Number);
 let outDir = flag('--out', null);
+const named = [];
+for (let i = args.indexOf('--page'); i !== -1; i = args.indexOf('--page')) {
+  const value = args[i + 1] ?? '';
+  args.splice(i, 2);
+  const eq = value.indexOf('=');
+  if (eq < 1 || !/^https?:\/\//.test(value.slice(eq + 1))) {
+    console.error('--page takes <name>=<http URL>');
+    process.exit(2);
+  }
+  named.push({ name: value.slice(0, eq).replace(/[^a-z0-9.-]+/gi, '-'), url: value.slice(eq + 1) });
+}
 
-if (args.length === 0) {
-  console.error('Usage: node check.mjs <file.html | folder | URL>... [--out <dir>] [--widths 1440,390]');
+if (args.length === 0 && named.length === 0) {
+  console.error('Usage: node check.mjs <file.html | folder | URL>... [--page <name>=<URL>]... [--out <dir>] [--widths 1440,390]');
   process.exit(2);
 }
 if (typeof WebSocket === 'undefined') {
@@ -51,6 +63,15 @@ for (const arg of args) {
     console.error(`Not found: ${arg}`);
     process.exit(2);
   }
+}
+pages.push(...named);
+const seen = new Set();
+for (const page of pages) {
+  if (seen.has(page.name)) {
+    console.error(`Two pages would save as ${page.name}: name each state with --page <name>=<URL>.`);
+    process.exit(2);
+  }
+  seen.add(page.name);
 }
 if (pages.length === 0) {
   console.error('No pages to check: the folder has no .html file besides index.html.');

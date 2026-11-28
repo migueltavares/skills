@@ -1,6 +1,6 @@
 ---
 name: mig-laravel-guardrails
-description: Stop agents from wiping Laravel databases. Installs a command guard for Claude Code and Codex, and a test database guard in a Laravel repo. Use once per machine, in a Laravel repo whose TestCase has no database guard, or after an agent ran migrate:fresh, db:wipe or tests against a real database.
+description: Stop agents from wiping Laravel databases. Installs a command guard for Claude Code and Codex, and a test database guard in a Laravel repo. Use once per machine, to add the test database guard to a Laravel repo, or after an agent ran migrate:fresh, db:wipe or tests against a real database.
 metadata:
   credits:
     - skill: git-guardrails-claude-code

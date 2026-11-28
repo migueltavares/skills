@@ -5,8 +5,11 @@
 #   - a Codex "forbidden" rule for the same commands
 #
 # Usage: install-global.sh [--check]
-#   --check  report what is installed and exit 1 if anything is missing,
-#            including a hook that runs a copy of the guard instead of this script.
+#   --check  report what is installed, change nothing, and exit 1 if anything
+#            is missing, including a hook that runs a copy of the guard instead
+#            of this script.
+# When the mig-skills Claude Code plugin is enabled, its own hook runs the guard,
+# so the Claude hook is left to the plugin.
 # Every file it changes is backed up first as <file>.bak-<timestamp>.
 
 set -euo pipefail
@@ -19,7 +22,6 @@ check=false
 for tool in jq python3; do
     command -v "$tool" >/dev/null || { echo "MISSING $tool: install it first, the guard needs it." >&2; exit 1; }
 done
-chmod +x "$guard"
 
 claude_settings="$HOME/.claude/settings.json"
 codex_dir="${CODEX_HOME:-$HOME/.codex}"
@@ -31,6 +33,15 @@ missing=0
 
 backup() { [ -f "$1" ] && cp "$1" "$1.bak-$stamp"; return 0; }
 report() { printf '%-8s %s\n' "$1" "$2"; [ "$1" = "MISSING" ] && missing=1; return 0; }
+
+if [ -x "$guard" ]; then
+    report OK "guard is executable: $guard"
+elif $check; then
+    report MISSING "guard is not executable: $guard"
+else
+    chmod +x "$guard"
+    report FIXED "guard made executable: $guard"
+fi
 
 # JSON edits go through python3 so existing settings keep their structure.
 # $1 file, $2 "claude" or "codex", $3 "check" or "install". Prints OK, MISSING or ADDED lines.
@@ -44,6 +55,9 @@ if os.path.exists(path):
         text = f.read().strip()
         data = json.loads(text) if text else {}
 pre = data.setdefault("hooks", {}).setdefault("PreToolUse", [])
+# The mig-skills plugin registers its own Claude hook, so a second one would run the guard twice.
+plugin = host == "claude" and any(
+    k.split("@")[0] == "mig-skills" and v for k, v in data.get("enabledPlugins", {}).items())
 hooks = [h for entry in pre for h in entry.get("hooks", [])
          if h.get("command", "").endswith("laravel-db-guard.sh")]
 has_hook = bool(hooks)
@@ -51,7 +65,11 @@ has_hook = bool(hooks)
 # only counts as installed when it runs this skill's own script.
 stale = [h for h in hooks if os.path.realpath(h["command"]) != os.path.realpath(guard)]
 changed = False
-if has_hook and not stale:
+if plugin and not has_hook:
+    print(f"OK       claude hook comes from the mig-skills plugin")
+elif plugin:
+    print(f"NOTE     claude hook in {path} runs the guard a second time, next to the mig-skills plugin's hook. Remove one of them.")
+elif has_hook and not stale:
     print(f"OK       {host} hook in {path}")
 elif has_hook and mode == "check":
     print(f"MISSING  {host} hook in {path} runs {stale[0]['command']}, not {guard}")

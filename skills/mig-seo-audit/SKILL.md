@@ -15,7 +15,7 @@ Takes a public site or landing page to launch quality, in order: intake, audit, 
 
 Scope is the public site. Logged-in apps, admin panels and portals are out. Changes ship as a PR, merged with `/mig-merge`. Steps in the user's accounts (Search Console, Analytics, Cloudflare, DNS, the mail provider) go through `mig-my-turn`.
 
-**Audit only.** When the user asks for an audit and fixes rather than a full launch, run steps 1 to 3 and skip the rest. Intake then asks only the questions that bear on the audit (site, offer, operator, AI crawlers). When a fix changes how pages look, build it with `mig-mockup` first and port it after the user picks.
+**Audit only.** When the user asks for an audit and fixes rather than a full launch, run steps 1 to 3 and skip the rest. Intake then asks only the questions that bear on the audit (site, offer, operator, AI crawlers, and pricing when the site has plans). When a fix changes how pages look, build it with `mig-mockup` first and port it after the user picks.
 
 ## 1. Intake
 
@@ -38,7 +38,7 @@ Done when every question is answered, or the user has said to skip it.
 
 ## 2. Audit
 
-Run the site locally. Go through [references/audit.md](references/audit.md) for every page and language, and through [references/seo-aeo-checklist.md](references/seo-aeo-checklist.md). When a local `.test` domain's certificate blocks the browser tool, fetch pages with `curl -sk`, or record traces against a plain-HTTP local server or the production URL, and say which one you used.
+Run the site locally. When the run will include speed work (step 6, or the user asked about speed), record the real performance trace from [references/performance.md](references/performance.md) now, before any change, and keep the numbers for the before and after. Go through [references/audit.md](references/audit.md) for every page and language, and through [references/seo-aeo-checklist.md](references/seo-aeo-checklist.md). When a local `.test` domain's certificate blocks the browser tool, fetch pages with `curl -sk`, or record traces against a plain-HTTP local server or the production URL, and say which one you used.
 
 Write the findings as one table ranked by severity: issue, page or file, fix. When the table runs past about 30 rows, write it to `docs/handoff/<YYYY-MM-DD>-seo-audit.md` and show a summary by severity in chat. Show copy changes as before and after, in every language. Portuguese copy follows `mig-pt-pt` when it is installed.
 
@@ -71,7 +71,7 @@ Done when, locally:
 
 ## 6. Speed
 
-Follow [references/performance.md](references/performance.md). Record a real performance trace before changing anything, since the PageSpeed mobile score is simulated.
+Follow [references/performance.md](references/performance.md). Compare against the trace from step 2, since the PageSpeed mobile score is simulated. When step 2 recorded none, record one before changing anything here.
 
 Done when every item there is applied or ruled out with a reason, and the user has the before and after numbers.
 

@@ -65,7 +65,7 @@ For each step, in order:
 
 - In T3 Code, call `delegate_task` with `role: "implementation"`, the brief as `task`, and `target` set to the provider, model and options for the role. Use `mode: "wait"` when the next step depends on this one, and the default `isolation: "shared"`, so the changes land in this checkout where step 5 reads them.
 - Elsewhere, use the host's own subagent tool with the role's model.
-- Run one implementer at a time when steps share files or a test database.
+- Run one implementer at a time when steps share files. Implementers that run tests at the same time each get their own test database, its name still ending in `_test`, created before delegating and named in each brief as a `DB_DATABASE=` prefix on every test command. Your own test runs count as one more worker. Laravel's `--parallel` only separates the processes inside one run, not two agents running suites side by side.
 
 Implementers edit files and run checks. They never stage, commit, push or open a PR, and every brief says so.
 

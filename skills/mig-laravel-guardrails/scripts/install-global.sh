@@ -5,7 +5,8 @@
 #   - a Codex "forbidden" rule for the same commands
 #
 # Usage: install-global.sh [--check]
-#   --check  report what is installed and exit 1 if anything is missing.
+#   --check  report what is installed and exit 1 if anything is missing,
+#            including a hook that runs a copy of the guard instead of this script.
 # Every file it changes is backed up first as <file>.bak-<timestamp>.
 
 set -euo pipefail
@@ -43,11 +44,22 @@ if os.path.exists(path):
         text = f.read().strip()
         data = json.loads(text) if text else {}
 pre = data.setdefault("hooks", {}).setdefault("PreToolUse", [])
-has_hook = any(h.get("command", "").endswith("laravel-db-guard.sh")
-               for entry in pre for h in entry.get("hooks", []))
+hooks = [h for entry in pre for h in entry.get("hooks", [])
+         if h.get("command", "").endswith("laravel-db-guard.sh")]
+has_hook = bool(hooks)
+# A hook that points at an older copy of the guard runs that old copy, so it
+# only counts as installed when it runs this skill's own script.
+stale = [h for h in hooks if os.path.realpath(h["command"]) != os.path.realpath(guard)]
 changed = False
-if has_hook:
+if has_hook and not stale:
     print(f"OK       {host} hook in {path}")
+elif has_hook and mode == "check":
+    print(f"MISSING  {host} hook in {path} runs {stale[0]['command']}, not {guard}")
+elif has_hook:
+    for h in stale:
+        h["command"] = guard
+    changed = True
+    print(f"UPDATED  {host} hook in {path} now runs {guard}")
 elif mode == "check":
     print(f"MISSING  {host} hook in {path}")
 else:

@@ -15,7 +15,7 @@ Fence: change only <files or areas>. Leave <the adjacent thing> alone.
 Pre-approved: <small edits next to the fence that you expect, such as a missing model relation, a factory state, or a test fixture that conflicts only because of the new rule>. Make these and list them in the report instead of asking.
 Stop and ask if: a named file or symbol is missing or has moved; the contract needs changes outside the fence and the pre-approved list; a test outside this step goes red; Verify passes for a reason the contract doesn't explain.
 
-Rules: do not stage, commit, push or open a PR. Run only the test files for this step, never the full suite, since other implementers may be testing at the same time and fakes such as Storage::fake share one directory. Run formatters (Pint, Prettier, php-cs-fixer) only on the files you changed, never on the whole repo, because other files in this checkout belong to other workers. <Project rules that apply.>
+Rules: do not stage, commit, push or open a PR. Run only the test files for this step, never the full suite, since other implementers may be testing at the same time and fakes such as Storage::fake share one directory. <When implementers run tests at the same time: prefix every test command with DB_DATABASE=<this worker's _test database>.> Run formatters (Pint, Prettier, php-cs-fixer) only on the files you changed, never on the whole repo, because other files in this checkout belong to other workers. <Project rules that apply.>
 Report: the files you changed, the Verify output, and anything you could not do, with the reason.
 ```
 

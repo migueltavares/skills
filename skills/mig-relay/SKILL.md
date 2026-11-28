@@ -25,9 +25,9 @@ The user works one issue or phase per thread, each with a fresh context. A threa
 
 Look, in this order:
 
-1. The plan this thread has been working from, or else the newest file in `docs/handoff/` (`ls -t docs/handoff/*.md`).
+1. The plan this thread has been working from, or else the newest work order in `docs/handoff/`. Other skills keep design records (`*-design.md`) and SEO findings (`*-seo-audit.md`) there too, so leave those out, and sort by the date the names start with, since checkouts reset file times: `ls docs/handoff/*.md | grep -vE -- '-(design|seo-audit)\.md$' | sort | tail -1`.
 2. An order written in the project's AGENTS.md or CLAUDE.md, or in a parent issue.
-3. Open issues and their "Blocked by" links: `gh issue list --state open --json number,title,body,labels`.
+3. Open issues and their "Blocked by" links: `gh issue list --state open --json number,title,body,labels --jq '.[] | {number, title, labels: [.labels[].name], blockedBy: [.body | scan("Blocked by #[0-9]+")]}'`.
 
 When none of these gives an order, propose one, show it, and on the user's OK write it to `docs/handoff/<YYYY-MM-DD>-<slug>.md`. Order by these rules:
 - The test gate and backups come first, because merges deploy.
@@ -42,7 +42,7 @@ Before writing its prompt, try to prove it is no longer needed:
 - Read the issue and open the files and symbols it names.
 - Read `git log` and the merged PRs since the issue was written. Earlier work often fixes part of it.
 
-Reach one verdict, citing the files you read or the commands you ran:
+Reach one verdict, citing the files you read or the commands you ran, and note the commit you checked against (`git rev-parse --short origin/<default branch>`):
 - **Still needed** as written.
 - **Needed, scope changed**: say what changed.
 - **Already done**: show the evidence, suggest closing the issue, and move to the next item.
@@ -57,16 +57,17 @@ One fenced `text` block of about 40 lines or fewer, shaped like this:
 Read first: AGENTS.md, <plan file>, issue #<N>.
 Last step: <PR #, one or two lines on what changed that this step builds on>.
 Task: #<N> <title>. <Required behaviour, including any scope change from the check>.
+Checked: <verdict> at <short sha of origin/default branch>. Evidence: <path:line or command>.
 Where: <files and symbols as path:line>.
 Done when: <observable behaviour>, and <the project's check commands> are green.
 Stop and ask if: <a named file or symbol is missing> / <the fix needs changes outside this scope> / <an unrelated test goes red>.
-Workflow: <the project's workflow from AGENTS.md>. <Model, effort and delegation rules from the project's instructions>. Mark #<N> done in <plan file> in the same commit or PR.
+Workflow: Run it with mig-orchestrator. <The project's workflow from AGENTS.md>. <Model, effort and delegation rules from the project's instructions>. Mark #<N> done in <plan file> in the same commit or PR.
 Lessons that apply: <only the ones that bear on this task>.
 After this: <the remaining order, short>.
 Start with #<N>.
 ```
 
-Write the Workflow line from the project's AGENTS.md. When it says nothing, use the default: "Branch <name> from origin/<default branch>. Open a PR with "Closes #<N>" (one "closes" per issue). Never push to <default branch>." A project that commits straight to the default branch gets that instead, never the branch and PR wording.
+Write the Workflow line from the project's AGENTS.md. Leave out "Run it with mig-orchestrator" when that skill isn't installed or the project's instructions say to implement directly. When AGENTS.md says nothing about the workflow, use the default: "Branch <name> from origin/<default branch>. Open a PR with "Closes #<N>" (one "closes" per issue). Never push to <default branch>." A project that commits straight to the default branch gets that instead, never the branch and PR wording.
 
 Carry only the last step. History lives in the plan file, which the next thread updates. Every path and command in the prompt must exist, and no secret goes in it.
 
@@ -75,15 +76,15 @@ Keep "Lessons that apply" short. A lesson that has already appeared in three pro
 ## 4. Hand over
 
 1. Print the block.
-2. Right next to the block, print one line naming the recommended model and effort for the next thread: `Next thread: <model>, <effort>. <One-sentence reason>.` Pick the orchestrator role from the project's `## Models` section or `~/.agents/mig/models.md`; when neither names an orchestrator row, fall back to this thread's model and effort and say so.
-3. Print the loose ends: uncommitted worktrees, untracked files, open PRs, checks not run. Give each one a verdict, either "fix now: <what you would do>" or "leave, because <reason>". Print `Loose ends: none` when there are none.
+2. Right next to the block, print one line naming the recommended model and effort for the next thread: `Next thread: <model>, <effort>. <One-sentence reason>.` Take the `Orchestrate` row from the project's `## Models` section or `~/.agents/mig/models.md`; when neither has one, use this thread's model and effort and say so.
+3. Print the loose ends. When the calling skill (`mig-merged`, `mig-merge`) handed over its list, use that list. Otherwise collect them: uncommitted worktrees, untracked files, open PRs, checks not run. Give each one a verdict, either "fix now: <what you would do>" or "leave, because <reason>". Print `Loose ends: none` when there are none.
 4. Send a push notification when the host has one (`PushNotification` in Claude Code): "<project>: next prompt ready, #<N>".
 5. Ask: "Open the next thread? Reply go." When any loose end says "fix now", ask instead: "Reply go to fix the loose ends marked fix now and open the next thread."
 
 On "go", fix the loose ends marked "fix now" first. Then, in T3 Code, open a thread in the same project with `t3_thread_launch`:
-- the prompt as its first message;
-- `modelSelection` set to the orchestrator role from the project's `## Models` section or `~/.agents/mig/models.md`, else this thread's model, with the effort the prompt asks for;
-- the same workspace strategy as this thread (a new worktree when this thread runs in one).
+- the prompt as its first message, and a short title such as `#<N> <title>`;
+- `modelSelection` set to the model and effort from item 2;
+- the same workspace strategy as this thread: a new worktree when `t3_worktree_status` shows this thread runs in one.
 
 Outside T3 Code, the prompt is ready to paste.
 

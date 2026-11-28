@@ -17,83 +17,55 @@ metadata:
 
 A merged PR leaves branches, worktrees and sometimes a stacked PR pointing at a branch that is about to disappear. This skill clears all of it, so the checkout sits on an up-to-date default branch and the next step can start.
 
-Input: PR numbers in any form (`/mig-merged 12 14`, "PR 12 and 14", "#12, #14"), optionally followed by `from mig-merge` when `mig-merge` calls it. With no numbers, find candidates: merged PRs whose head branch still exists locally, on `origin`, or as a worktree.
+Input: PR numbers in any form (`/mig-merged 12 14`, "PR 12 and 14", "#12, #14"), optionally followed by `from mig-merge` when `mig-merge` calls it. With no numbers, run the sweep in step 1.
 
-```bash
-gh pr list --state merged --limit 100 --json number,headRefName,headRefOid,mergedAt
-gh pr list --state open --json number,headRefName
-git branch --format='%(refname:short)'
-git ls-remote --heads origin
-git worktree list --porcelain
-```
-
-Skip the default branch, any branch with an open PR, any branch with no merged PR, and any branch whose current tip has commits not in the merged PR's `headRefOid` (such as a reused branch name or late commits, which go through step 4 instead). Show the remaining candidates and clean up the ones the user confirms.
+`scripts/cleanup.sh`, next to this file, does every deterministic part and has tests. Run it, then handle only the lines it hands back. Run it from any checkout of the PR's repo; it works in the main checkout itself.
 
 ## Safety rules
 
-- Delete a branch only after `gh` reports its PR as `MERGED`, and only when the branch holds nothing the PR did not (step 4).
-- Retarget before deleting. Deleting a branch that an open PR uses as its base closes that PR.
+- A branch is deleted only after `gh` reports its PR as `MERGED`, and only when it holds nothing the PR did not. The script checks both, and reads the remote tip again just before deleting.
+- Retarget before deleting. Deleting a branch that an open PR uses as its base closes that PR, so the script keeps such a branch and reports it.
 - History only moves forward here: plain pushes, merges and cherry-picks.
 
-## Steps
+## 1. Sweep, when no PR numbers were given
 
-Run from the main checkout of the PR's own repo, the first entry in its `git worktree list`. When the PR belongs to a repo other than the working directory, run every step there, including step 2, with `git -C <path>` or `cd <path>`.
+Run `bash <skill-dir>/scripts/cleanup.sh` with no arguments. It changes nothing. Each `CANDIDATE` line names a merged PR whose branch or worktree is still around and holds nothing beyond that PR. Show them, and continue with step 2 for the ones the user confirms. `CANDIDATE none` ends the run.
 
-**1. Verify.** For each PR:
+## 2. Run the cleanup
 
-```bash
-gh pr view <n> --json state,mergedAt,mergeCommit,headRefName,headRefOid,baseRefName
-```
-
-A PR that is not `MERGED` is skipped and reported. When the user wants the agent to merge it, ask them to run `/mig-merge <n>`, or read `mig-merge/SKILL.md` and follow its full gate and deploy wait when they already gave merge approval in this thread (`mig-merge` disables model invocation, so a Skill tool call refuses it). Never merge with a bare `gh pr merge` or `pull_request_merge`, which skips the gate and the deploy wait.
-
-**2. Update the default branch.** `git fetch --prune origin`, switch to the default branch, `git pull --ff-only`. Uncommitted changes in the main checkout come along when the switch and pull succeed: list them in the report. Stop and ask only when git refuses because they conflict.
-
-**3. Retarget stacked PRs.** For each merged head branch:
+In T3 Code, first find the worktrees other threads use: list the project's unsettled threads with `t3_thread_list` (`settled: false`), and for each one other than this thread, call `t3_worktree_list` with its `threadId`. Pass each of their checkout paths as `--skip-worktree <path>`.
 
 ```bash
-gh pr list --state open --base <headRefName> --json number,headRefName
+bash <skill-dir>/scripts/cleanup.sh [--skip-worktree <path>]... <pr>...
 ```
 
-For each PR found:
-1. `gh pr edit <m> --base <default branch>`.
-2. In that PR's branch or worktree, `git merge origin/<default branch>`. The merged content is already on the default branch, so conflicts usually resolve to its side. Stop and ask when a resolution is not obvious.
-3. Run the project's checks, then `git push`.
-4. Tell the user that CI runs again on that PR before it can merge.
+The script updates the default branch in the main checkout, removes clean worktrees on merged branches, deletes the local and remote branches, and checks the issues each PR closes. Add `--plan` to see what it would do without changing anything.
 
-**4. Rescue late commits.** Commits pushed to a branch after its PR merged would vanish with the branch. Check both copies:
+Exit 0 means nothing is left for you. Exit 3 means some lines need you; the last line repeats them as `Loose ends:`. Exit 1 means git or gh failed: show the error and stop.
 
-```bash
-git rev-list <headRefOid>..<branch>          # local
-git rev-list <headRefOid>..origin/<branch>   # remote, if it still exists
-```
+## 3. Handle the lines it hands back
 
-When git reports `<headRefOid>` as an unknown revision, fetch it first with `git fetch origin pull/<n>/head`. When either check lists commits, create `<branch>-followup` from `origin/<default branch>`, cherry-pick them, push, and open a PR that names the original. In T3 Code, link it with `link_pull_request`. The old branch stays until that PR exists.
+- `STACKED #m on <branch>`: retarget each PR with `gh pr edit <m> --base <default branch>`. In that PR's branch or worktree, `git merge origin/<default branch>`; the merged content is already on the default branch, so conflicts usually resolve to its side. Stop and ask when a resolution is not obvious. Run the project's checks, `git push`, tell the user that CI runs again on that PR, then run the script again for the merged PR.
+- `LATE <branch>`: commits landed after the merge and would vanish with the branch. Create `<branch>-followup` from `origin/<default branch>`, cherry-pick the listed commits, push, and open a PR that names the original. In T3 Code, link it with `link_pull_request`. The old branch stays until that PR exists.
+- `DIRTY <path>`: leave it. It goes in the loose ends as "you: commit or drop the changes in `<path>`".
+- `ISSUE #N is still open`: close a fully delivered issue with `gh issue close <N> --comment "Delivered in #<n>."`. On a partly delivered one, comment with what the PR did and what is left, and leave it open.
+- `PARTIAL #N`: GitHub closed it because of "Closes part of #N" wording. Reopen it with `gh issue reopen <N>` and the same kind of comment.
+- `SKIP #n is OPEN` (or `CLOSED`): not merged. When the user wants the agent to merge it, ask them to run `/mig-merge <n>`, or read `mig-merge/SKILL.md` and follow its full gate and deploy wait when they already gave merge approval in this thread (`mig-merge` disables model invocation, so a Skill tool call refuses it). Never merge with a bare `gh pr merge` or `pull_request_merge`, which skips the gate and the deploy wait.
+- `CHANGED origin/<branch>`: someone pushed after the merge. Treat it like `LATE`.
+- `STOP ...`: read it, fix the cause when it is clear, and run the script again. Otherwise show it to the user.
 
-**5. Remove worktrees.** For each worktree on a merged branch:
-- Skip it when `git -C <path> status --porcelain` shows changes. It goes in the loose ends line.
-- In T3 Code, skip it when another open thread still uses it (`t3_worktree_list`).
-- When it is the worktree this thread runs in (`t3_worktree_status` shows it attached), run `git -C <path> switch --detach origin/<default branch>` now, so step 6 can delete the branch. Remove the folder at the very end, as described under "Report and hand off".
-- Otherwise `git worktree remove <path>`.
+Write comment text to a file and pass it with `--body-file`, never inline in the command.
 
-Then run `git worktree prune`.
-
-**6. Delete branches.**
-- Local: when `git merge-base --is-ancestor <branch> <headRefOid>` succeeds, `git branch -D <branch>`. Squash merges make `git branch -d` refuse, and the ancestor check is what makes `-D` safe.
-- Remote: `git push origin --delete <branch>`, unless `git ls-remote --heads origin <branch>` shows GitHub already removed it.
-
-**7. Close the issues.** For each issue the PR body names with `Closes #N`, `gh issue view <N> --json state` should show `CLOSED`. Close a fully delivered issue that stayed open with `gh issue close <N> --comment "Delivered in #<n>."`. On a partly delivered one, comment with what the PR did and what is left, and leave it open. GitHub closes an issue for phrases like "Closes part of #N" too: reopen such an issue with `gh issue reopen <N>` and the same comment.
-
-Done when every merged PR's branch and clean worktrees are gone, its issues are closed or commented, every stacked PR targets the default branch, and the main checkout is on the updated default branch.
+Done when the script exits 0, or every line it handed back is handled or listed as a loose end.
 
 ## Report and hand off
 
-One line per PR: number, merge commit, branches deleted, worktrees removed, PRs retargeted, late commits moved, issues closed. Then the loose ends. Each one names who acts and what to run, such as "you: commit or drop the changes in `<path>`" or "CI: #14 reruns after the retarget, nothing to do". Print only the parts that apply, or `Loose ends: none`.
+One line per PR: number, merge commit, branches deleted, worktrees removed, PRs retargeted, late commits moved, issues closed. Then the loose ends, each naming who acts and what to run, such as "you: commit or drop the changes in `<path>`" or "CI: #14 reruns after the retarget, nothing to do". Print only the parts that apply, or `Loose ends: none`.
 
 Then:
-- Called with `from mig-merge`: return here. `mig-merge` hands off once, after its last PR.
+- Called with `from mig-merge`: return the report lines and the `LAST` line, if any, to `mig-merge`, without a hand-off. `mig-merge` hands off once, after its last PR.
 - The next step needs the user first (credentials, a server step, a decision): say exactly what, and stop.
-- Work remains in an order (a plan in `docs/handoff/`, open issues this thread was working through, a later phase): invoke `mig-relay` for the next prompt.
+- Work remains in an order (a plan in `docs/handoff/`, open issues this thread was working through, a later phase): invoke `mig-relay` for the next prompt, and pass it the loose ends so it doesn't collect them again.
 - Nothing remains: stop after the report.
 
-When step 5 detached this thread's own worktree, its removal is the last command of the run, after the hand-off, because this thread's shell stops working once its folder is gone. Run `git -C <main checkout> worktree remove <path>`, then tell the user the worktree is gone and this thread is finished. Called with `from mig-merge`, leave it to `mig-merge`, which removes it after its own finish.
+When the script printed `DETACHED <path>` and `LAST git -C <main> worktree remove <path>`, this thread runs in that worktree. Run the `LAST` command only once this thread needs nothing more: after the user declines the next thread, after the next thread is launched, or right after the report when no hand-off follows. This thread's shell stops working once its folder is gone, so tell the user the worktree is gone and this thread is finished. Called with `from mig-merge`, leave it to `mig-merge`.

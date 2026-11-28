@@ -27,44 +27,15 @@ With PR numbers in any form (`/mig-merge 12 14 15`, "PR 12 and 14"), take exactl
 With none, list the open PRs:
 
 ```bash
-gh pr list --state open --json number,title,isDraft,baseRefName,reviewDecision,mergeStateStatus,statusCheckRollup
+gh pr list --state open --json number,title,isDraft,baseRefName,reviewDecision,mergeStateStatus,statusCheckRollup \
+  --jq 'map({number,title,isDraft,baseRefName,reviewDecision,mergeStateStatus,checks:(.statusCheckRollup|map(.conclusion // .state // .status)|group_by(.)|map("\(.[0]):\(length)")|join(" "))})'
 ```
 
 Show a table (number, title, checks, review, mergeable) and ask "All of them, or which numbers?" with the host's question tool (`AskUserQuestion` in Claude Code, `request_user_input` in Codex), so the thread shows it is waiting. Drafts never count as "all".
 
-## 2. Prepare the repo
+## 2. Read the Deploy section
 
-Once per repo, before the first merge.
-
-**Squash only.** Check with `gh api repos/<owner>/<repo> --jq '{squash: .allow_squash_merge, merge: .allow_merge_commit, rebase: .allow_rebase_merge}'`. When merge commits or rebase are allowed:
-
-```bash
-gh repo edit --enable-squash-merge --enable-merge-commit=false --enable-rebase-merge=false \
-  --squash-merge-commit-message pr-title-description
-```
-
-Tell the user it changed. Without admin rights on the repo, say so and carry on with `--squash`.
-
-**Deploy section.** Read the project's instructions: AGENTS.md, or CLAUDE.md when it holds the guidance instead of pointing to AGENTS.md. Find the `## Deploy` section. When it's missing, work it out:
-- Run `gh workflow list --all` and read the deploy workflows in `.github/workflows/`. Note how each one starts: on push to the default branch, after another workflow finishes (`workflow_run`, usually CI), by hand (`workflow_dispatch`), or on a release tag. A workflow marked disabled deploys nothing.
-- A hosting platform that deploys on push (Forge, Ploi, Vercel, Netlify, a PaaS) means the platform deploys. Look for its API or CLI. Ask the user for a read-only token with the host's secret tool (`request_secret` in T3 Code), and write the status command into the section, so later runs check the deploy themselves instead of asking the user.
-- Nothing of the above means a manual deploy. Ask the user where they run it (a server alias, never a secret), the directory, the command, and how they know it worked.
-- A repo that ships nothing on merge (a library, a docs or skills repo) gets `Method: none`. Confirm it with the user before writing it.
-
-Then write the section into the file that owns the guidance, never into both. When neither file exists, create AGENTS.md, plus a CLAUDE.md that holds only `@AGENTS.md`.
-
-```markdown
-## Deploy
-
-- Trigger: merge to `main`.
-- Method: GitHub Actions, workflow `deploy.yml`.
-  (Or: Platform, <name>, status with `<command>`. Or: Manual, on <server>, run `cd <dir> && ./deploy.sh`.)
-- Starts: on push. (Or: after the CI workflow passes on `main`. Or: by hand, `gh workflow run deploy.yml --ref main`. Or: on a release tag, `<command>`.)
-- Environment: production, <URL>.
-- Healthy when: the workflow run succeeds, and <URL> returns 200.
-```
-
-The edit goes in a small docs PR. Ask the user whether to add it to the end of this run. A yes approves merging that docs PR in this run too.
+Once per repo, read the project's instructions: AGENTS.md, or CLAUDE.md when it holds the guidance instead of pointing to AGENTS.md. Use its `## Deploy` section for every PR in that repo. When the section is missing, read [references/prepare.md](references/prepare.md) and follow it before the first merge.
 
 ## 3. Order
 
@@ -78,65 +49,69 @@ Show the order as a numbered list, one line of reasoning per PR, then start.
 
 ## 4. For each PR, in order
 
-**a. Gate.** Read the state:
+**a. Gate.** Read the state, the checks and the unresolved review threads.
 
-```bash
-gh pr view <n> --json state,isDraft,mergeable,mergeStateStatus,reviewDecision,headRefOid,baseRefName,statusCheckRollup
-```
+- In T3 Code: `pull_request_read` with `include: ["checks", "threads", "body"]`. It has no review decision, so also run `gh pr view <n> --json reviewDecision`.
+- Elsewhere:
+
+  ```bash
+  gh pr view <n> --json state,isDraft,mergeable,mergeStateStatus,reviewDecision,headRefOid,baseRefName,body,statusCheckRollup \
+    --jq '{state,isDraft,mergeable,mergeStateStatus,reviewDecision,headRefOid,baseRefName,hasDeployNotes:(.body|test("(?m)^## Deploy notes")),checks:(.statusCheckRollup|map({name:(.name // .context),result:(if (.conclusion // "") != "" then .conclusion else (.state // .status) end)})|{passed:(map(select(.result=="SUCCESS"))|length),other:map(select(.result!="SUCCESS"))})}'
+  bash <mig-review-findings dir>/scripts/pr-threads.sh collect <n>
+  ```
+
+  `pr-threads.sh` reads every page of threads and says `"complete": false` when anything was cut short. Treat an incomplete read as not green.
+
+Then:
 
 - Its base must be the default branch. A stacked PR gets retargeted by the cleanup after its base merges, and then needs green checks again.
 - `BEHIND`: `gh pr update-branch <n>`, then wait for checks.
 - `DIRTY`: merge the default branch into the PR branch, resolve, run the checks, push. Stop when a resolution is not obvious.
 - Checks pending: wait without polling. In T3 Code, call `watch_pull_request` and end the turn, and you are woken when something changes. Elsewhere, run `gh pr checks <n> --watch --fail-fast` as one command.
 - Checks red: find the cause. Fix real failures on the PR branch. Rerun an infrastructure flake once with `gh run rerun <id> --failed`.
-- Review threads: list the unresolved ones. REST comments can't show whether a thread is resolved, so use GraphQL:
-
-  ```bash
-  gh api graphql -F owner=<owner> -F repo=<repo> -F n=<n> -f query='
-    query($owner:String!,$repo:String!,$n:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$n){
-      reviewThreads(first:100){nodes{isResolved path line comments(first:1){nodes{author{login} body}}}}}}}' \
-    --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved|not)]'
-  ```
-
-  Any unresolved thread: run `mig-review-findings` on the PR. Items it leaves for the user stop the run.
+- Unresolved threads, or review bodies and comments that ask for a change: run `mig-review-findings` on the PR and hand it what you just read, so it doesn't collect again. Items it leaves for the user stop the run.
 - A human review that requests changes stops the run.
 - Server steps that must happen before the merge (a new env var, a package to install, a directory to create), named in the deploy notes or the Deploy section: hand them to `mig-my-turn` and wait for them to be confirmed.
 
-The gate passes when, on the latest head commit, checks are green, every review thread is resolved, no review requests changes, the pre-merge server steps are done, and GitHub reports the PR mergeable.
+The gate passes when, on the latest head commit, checks are green, every review thread is resolved, no review requests changes, the pre-merge server steps are done, and GitHub reports the PR mergeable. Read the gate again after any push or new review.
 
-**b. Deploy notes.** When the PR body has no deploy notes, add a `## Deploy notes` section from the diff with `gh pr edit <n> --body-file <file>`. Cover migrations (say if any drop or rewrite data), new env vars, queue or scheduler restarts, cache clears, server steps, and the rollback (`git revert <merge commit>`, plus what a migration needs).
+**b. Deploy notes.** When the PR body has no `## Deploy notes` section, add one from the diff: write the body to a file and run `gh pr edit <n> --body-file <file>`. Cover migrations (say if any drop or rewrite data), new env vars, queue or scheduler restarts, cache clears, server steps, and the rollback (`git revert <merge commit>`, plus what a migration needs).
 
-**c. Merge.**
+**c. Merge.** In T3 Code, `pull_request_merge` with `method: "squash"` and `expectedHeadSha: <headRefOid>`. Elsewhere:
 
 ```bash
 gh pr merge <n> --squash --match-head-commit <headRefOid>
 ```
 
-`--match-head-commit` refuses the merge when someone pushed after the gate passed. With a merge queue or auto-merge, wait until GitHub reports `MERGED`.
+Both refuse the merge when someone pushed after the gate passed. With a merge queue or auto-merge, wait until GitHub reports `MERGED`.
 
-**d. Deploy.** Follow the Deploy section and its `Starts:` line. With `Method: none`, go straight to cleanup.
-- GitHub Actions: start the run by hand first when `Starts:` says so. Then find it with one background command instead of a loop you write each time:
+**d. Deploy.** Follow the Deploy section and its `Starts:` line. With `Method: none`, or when the Deploy section says this PR's paths deploy nothing, go straight to cleanup.
+- GitHub Actions: start the run by hand first when `Starts:` says so. Then wait with the script next to this file, as one command:
 
   ```bash
-  sha=<merge commit sha>; for i in $(seq 1 36); do
-    id=$(gh run list --commit "$sha" --workflow <deploy workflow> --json databaseId --jq '.[0].databaseId')
-    [ -n "$id" ] && exec gh run watch "$id" --exit-status; sleep 10; done; echo "no deploy run after 6 minutes"; exit 1
+  bash <skill-dir>/scripts/wait-deploy.sh --sha <merge commit sha> --workflow <deploy workflow> [--after <CI workflow>] [--timeout <seconds>]
   ```
 
-  When the deploy starts after CI, CI runs first, so allow for its time. In T3 Code, run the command in the background and wait with `t3_background_wait`.
+  Pass `--after` when the deploy starts after CI; the script watches CI first and fails fast when it goes red. It prints `RUN <workflow> <id> <url>` as soon as a run exists. Exit 0 is deployed, 1 a failed deploy with the log tail, 2 a red CI, 3 no run in time, 4 a disabled or missing workflow. In T3 Code, run it in the background and wait with `t3_background_wait`.
 - Platform: run the status command from the Deploy section until it reports the merge commit as deployed.
 - Manual: hand the step to `mig-my-turn` when it is installed. Otherwise give the user one block, labeled with the machine ("On <server>"), holding the exact commands. Ask with the question tool for the output or "deployed", and check the reply before going on.
 - Then the health check, when the section names one.
 
-Never tell the user a deploy is running until you have a run id or the platform shows it. When no run appears in time, say so plainly, check whether the workflow is disabled or waits on CI, and ask.
+Never tell the user a deploy is running until you have a run id or the platform shows it. Exit 3 or 4 from the script: say so plainly and ask.
 
 A deploy the user postpones (they will run it later, or the script refuses to run now): run the cleanup for this PR anyway, list the deploy in the loose ends, and stop before the next PR.
 
-A failed deploy stops the whole run, and leaves the remaining PRs unmerged. Show the failing log tail (`gh run view <id> --log-failed | tail -50`), then:
+A failed deploy stops the whole run, and leaves the remaining PRs unmerged. Show the failing log tail, then:
 - When it failed before production changed (a build, test or packaging step), propose a fix-forward PR.
 - When production changed, offer the rollback from the deploy notes.
 
-**e. Clean up.** Invoke `mig-merged` with `<n> from mig-merge`, so it skips its own hand-off. Never replace `mig-merged` with a hand-rolled cleanup script, even one that copies its steps.
+**e. Clean up.** Run `mig-merged`'s script for this PR:
+
+```bash
+bash <mig-merged dir>/scripts/cleanup.sh [--skip-worktree <path>]... <n>
+```
+
+In T3 Code, pass `--skip-worktree` for each worktree another thread uses, found as `mig-merged` step 2 describes. Exit 0: done. Exit 3: invoke `mig-merged` with `<n> from mig-merge` to handle the lines the script handed back. Never replace the script or `mig-merged` with a hand-rolled cleanup.
 
 A PR is done when it is merged, its deploy is confirmed healthy, and its cleanup ran.
 
@@ -148,8 +123,8 @@ Print the report before anything else: one row per PR with number, title, merge 
 Loose ends: <PRs left unmerged> | <postponed deploys> | <retargeted PRs waiting for CI> | <dirty worktrees> | none
 ```
 
-Next, run `mig-merged` with no PR numbers (and `from mig-merge`) to scan for older merged branches and worktrees left behind before this run, both local and remote. Show any candidates for confirmation, and leave alone branches with no merged PR or with an open PR.
+Next, sweep for older merged branches and worktrees with `bash <mig-merged dir>/scripts/cleanup.sh` and no arguments. It changes nothing. Show the `CANDIDATE` lines for confirmation, and run the script with the confirmed PR numbers.
 
-Then, after the report and sweep are done, invoke `mig-relay` once, when work remains in an order.
+Then invoke `mig-relay` once, when work remains in an order, and pass it the loose ends.
 
-Last, when `mig-merged` detached this thread's own worktree, remove it with `git -C <main checkout> worktree remove <path>`, the final command of the run.
+When a cleanup printed a `LAST` line, this thread runs in a worktree that is now detached. Run that command only when this thread needs nothing more: after the user declines the next thread, after the next thread is launched, or right after the report when no hand-off follows. It is the final command of the run.

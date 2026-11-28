@@ -45,11 +45,11 @@ collect)
     query='query($o:String!,$r:String!,$n:Int!,$endCursor:String){repository(owner:$o,name:$r){pullRequest(number:$n){
   headRefOid reviewDecision
   reviewThreads(first:100, after:$endCursor){pageInfo{hasNextPage endCursor}
-    nodes{id isResolved isOutdated path line comments(first:50){totalCount nodes{databaseId author{login} body}}}}
-  reviews(last:50){totalCount nodes{author{login} state body commit{oid}}}
-  comments(last:100){totalCount nodes{author{login} body}}
+    nodes{id isResolved isOutdated path line comments(first:50){totalCount nodes{databaseId author{login} authorAssociation body}}}}
+  reviews(last:50){totalCount nodes{author{login} authorAssociation state body commit{oid}}}
+  comments(last:100){totalCount nodes{author{login} authorAssociation body}}
 }}}'
-    pages=$(gh api graphql --paginate --slurp -F o="$owner" -F r="$name" -F n="$pr" -f query="$query") || die "gh api graphql failed"
+    pages=$(gh api graphql --paginate --slurp -f o="$owner" -f r="$name" -F n="$pr" -f query="$query") || die "gh api graphql failed"
     jq '
       [.[].data.repository.pullRequest] as $p
       | ($p[0]) as $first
@@ -58,10 +58,10 @@ collect)
           headRefOid: $first.headRefOid,
           reviewDecision: $first.reviewDecision,
           threads: [$open[] | {id, path, line, isOutdated,
-                     comments: [.comments.nodes[] | {databaseId, author: .author.login, body}],
+                     comments: [.comments.nodes[] | {databaseId, author: .author.login, association: .authorAssociation, body}],
                      truncated: (.comments.totalCount > (.comments.nodes | length))}],
-          reviews: [$first.reviews.nodes[] | select(.body != "") | {author: .author.login, state, body, commit: .commit.oid}],
-          comments: [$first.comments.nodes[] | {author: .author.login, body}],
+          reviews: [$first.reviews.nodes[] | select(.body != "") | {author: .author.login, association: .authorAssociation, state, body, commit: .commit.oid}],
+          comments: [$first.comments.nodes[] | {author: .author.login, association: .authorAssociation, body}],
           truncated: ([
               ($open[] | select(.comments.totalCount > (.comments.nodes | length)) | "thread \(.id) has more than 50 comments"),
               (if $first.reviews.totalCount > 50 then "only the last 50 of \($first.reviews.totalCount) reviews" else empty end),
@@ -72,7 +72,7 @@ collect)
     ;;
 respond)
     [ -n "$file" ] && [ -f "$file" ] || die "respond needs an actions file"
-    jq -e 'type == "array" and all(.[]; (.threadId | type == "string") and (.commentId | type == "number") and (.body | type == "string"))' "$file" >/dev/null \
+    jq -e 'type == "array" and all(.[]; (.threadId | type == "string" and test("^[A-Za-z0-9_-]+$")) and (.commentId | type == "number" and . > 0 and floor == .) and (.body | type == "string"))' "$file" >/dev/null \
         || die "$file must be an array of {threadId, commentId, body, resolve}"
     failed=0
     count=$(jq length "$file")
@@ -86,7 +86,7 @@ respond)
             echo "FAILED reply $thread"; failed=1; continue
         fi
         if [ "$(jq -r '.resolve // false' <<<"$item")" = true ]; then
-            if gh api graphql -F id="$thread" -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' >/dev/null; then
+            if gh api graphql -f id="$thread" -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' >/dev/null; then
                 echo "RESOLVED $thread"
             else
                 echo "FAILED resolve $thread"; failed=1

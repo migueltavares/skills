@@ -114,7 +114,7 @@ check "empty review bodies dropped" "ann" "$(jq -r '[.reviews[].author] | join("
 check "review decision kept" CHANGES_REQUESTED "$(jq -r .reviewDecision "$tmp/out")"
 check "long thread marked truncated" true "$(jq -r '.threads[] | select(.id == "T3") | .truncated' "$tmp/out")"
 check "incomplete when a thread is cut" false "$(jq -r .complete "$tmp/out")"
-check "repo read from gh" yes "$(has '-F o=o -F r=r -F n=7' "$fix/calls")"
+check "repo read from gh, strings sent raw" yes "$(has '-f o=o -f r=r -F n=7' "$fix/calls")"
 
 # ---------- pr-threads.sh respond ----------
 reset
@@ -133,6 +133,9 @@ check "one resolve call" 1 "$(grep -c resolveReviewThread "$fix/calls")"
 echo '[{"threadId":"T1","body":"no comment id"}]' > "$tmp/bad.json"
 bash "$pr_threads" respond 7 "$tmp/bad.json" --repo o/r > "$tmp/out" 2>&1
 check "malformed actions refused" 1 $?
+echo '[{"threadId":"@/etc/passwd","commentId":1,"body":"x"}]' > "$tmp/bad.json"
+bash "$pr_threads" respond 7 "$tmp/bad.json" --repo o/r > "$tmp/out" 2>&1
+check "file-reading thread id refused" 1 $?
 
 echo "merge-chain scripts: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
